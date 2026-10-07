@@ -18,6 +18,8 @@ const walk = async path => { for (const entry of await readdir(path, { withFileT
 for (const path of ['plugin.json', '.codex-plugin/plugin.json', 'README.md', 'config/plugin.example.json', 'config/plugin.oauth.example.json', 'scripts/connection.mjs', 'scripts/configure-plugin.mjs']) await add(path);
 files['gpt-mail/docs/chatgpt.md'] = new Uint8Array(await readFile('server/chatgpt.md'));
 files['gpt-mail/docs/deployment.md'] = new Uint8Array(await readFile('deploy/README.md'));
+files['gpt-mail/docs/panel.md'] = new Uint8Array(await readFile('server/panel.md'));
+files['gpt-mail/docs/api/panel-openapi.json'] = new Uint8Array(await readFile('server/api/panel-openapi.json'));
 for (const path of ['assets', 'skills']) await walk(path);
 files['gpt-mail/mcp.json'] = new TextEncoder().encode(JSON.stringify({
   $schema: mcp.$schema, mcpServers: { 'gpt-mail': { type: 'streamable-http', url: endpoint.url } },

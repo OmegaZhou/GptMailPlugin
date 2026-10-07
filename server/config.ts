@@ -8,7 +8,7 @@ const endpoint = z.object({
   user: z.string().min(1).optional(),
   passwordEnv: z.string().min(1).optional(), accessTokenEnv: z.string().min(1).optional(),
 }).strict();
-const accountSchema = z.object({
+export const accountSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), email: z.email(), name: z.string().optional(),
   imap: endpoint, smtp: endpoint,
   folders: z.object({ drafts: z.string(), sent: z.string(), trash: z.string(), archive: z.string() }).partial().default({}),

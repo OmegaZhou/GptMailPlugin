@@ -45,6 +45,8 @@ ChatGPT 连接 `/chatgpt/mcp`，原有 API Key 客户端连接 `/mcp` 或 REST�
 
 ## 2. 在 ChatGPT 中连接
 
+如需先添加邮箱，可打开本服务 `/panel/`；`/mail-mcp` 部署使用 `/mail-mcp/panel/`。授权页也提供面板入口，使用服务端密钥登录即可配置。面板是服务提供的网页，ChatGPT 设置页不会直接显示 IMAP/SMTP 表单。详细步骤见 [面板说明](panel.md)。
+
 根据当前官方 [连接文档](https://developers.openai.com/plugins/deploy/connect-chatgpt)，在支持自定义 MCP 的账号/工作区中：
 
 1. 打开 Plugins，选择添加自定义 MCP（Add custom MCP）。

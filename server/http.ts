@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { z } from 'zod';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -10,6 +11,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from './server.js';
 import { MailService } from './service.js';
 import { configSchema } from './config.js';
+import type { Config } from './config.js';
+import { PanelStore } from './panel-store.js';
+import { panelRouter, type ConnectionVerifier } from './panel.js';
 import { MailOAuthProvider, oauthConfigSchema } from './oauth.js';
 import { mailOAuthRouter } from './oauth-router.js';
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
@@ -28,7 +32,8 @@ export const httpConfigSchema = z.object({
 export type HttpOptions = z.infer<typeof httpConfigSchema>;
 const digest = (key: string) => createHash('sha256').update(key).digest();
 
-export async function createHttpApp(options: HttpOptions, service = new MailService(), oauthStateDirectory?: string) {
+export async function createHttpApp(options: HttpOptions, service?: MailService, oauthStateDirectory?: string,
+  panelOptions?: { directory?: string; baseConfig?: () => Promise<Config>; verify?: ConnectionVerifier }) {
   const settings = httpConfigSchema.parse(options);
   const { http } = settings;
   const prefix = settings.oauth?.routePrefix || '';
@@ -36,12 +41,17 @@ export async function createHttpApp(options: HttpOptions, service = new MailServ
   if (base && (base.pathname !== '/' || base.search || base.hash || base.username || base.password ||
     (base.protocol !== 'https:' && !(base.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname))))) throw new Error('publicUrl must be an HTTPS origin (HTTP only on loopback).');
   const app = express(); app.disable('x-powered-by');
+  const panelStore = await new PanelStore(panelOptions?.directory || join(oauthStateDirectory ||
+    process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state'), 'panel'), settings.apiKey,
+    panelOptions?.baseConfig || (async () => settings.mail)).init();
+  service ||= new MailService(() => panelStore.mail(), undefined, undefined, undefined, (account, kind) => panelStore.credentials(account, kind));
   if (http.trustProxy) app.set('trust proxy', http.trustProxy);
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
     if (base && req.headers.host !== base.host) { res.status(421).json({ error: 'Unrecognized host' }); return; }
     const origin = req.headers.origin;
-    const origins = [...(base ? [base.origin] : []), ...http.allowedOrigins];
+    const localOrigin = !base && ['localhost', '127.0.0.1', '[::1]'].includes(req.hostname) ? `${req.protocol}://${req.get('host')}` : undefined;
+    const origins = [...(base ? [base.origin] : localOrigin ? [localOrigin] : []), ...http.allowedOrigins];
     if (origin && !origins.includes(origin)) { res.status(403).json({ error: 'Unrecognized origin' }); return; }
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin');
@@ -54,11 +64,14 @@ export async function createHttpApp(options: HttpOptions, service = new MailServ
   });
   app.get(['/healthz', ...(prefix ? [prefix + '/healthz'] : [])], (_req, res) => res.json({ status: 'ok' }));
   app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: true, legacyHeaders: false }));
+  app.get(`${prefix}/panel`, (req, res, next) => { if (req.path === `${prefix}/panel`) res.redirect(303, `${prefix}/panel/`); else next(); });
+  app.use(`${prefix}/panel/`, panelRouter(panelStore, settings.apiKey, prefix, base?.origin,
+    settings.oauth?.enabled ? settings.oauth.mcpPath || '/chatgpt/mcp' : `${prefix}/mcp`, settings.oauth?.enabled ? 'oauth' : 'apiKey', panelOptions?.verify));
   async function handleMcp(req: express.Request, res: express.Response, oauth?: { scopes: string[]; metadataUrl: string }) {
     if (req.method !== 'POST') { res.status(405).setHeader('Allow', 'POST'); res.end(); return; }
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true,
       ...(base ? { enableDnsRebindingProtection: true, allowedHosts: [base.host], allowedOrigins: [base.origin, ...http.allowedOrigins] } : {}) });
-    const server = createServer(service, oauth);
+    const server = createServer(service!, oauth);
     res.on('close', () => { void transport.close(); void server.close(); });
     try { await server.connect(transport); await transport.handleRequest(req, res, req.body); }
     catch { if (!res.headersSent) res.status(500).json({ error: 'MCP request failed' }); }
@@ -87,7 +100,7 @@ export async function createHttpApp(options: HttpOptions, service = new MailServ
   app.all(['/mcp', ...(prefix ? [prefix + '/mcp'] : [])], (req, res) => handleMcp(req, res));
   // REST uses the exact same MCP validation and handlers; no duplicate mail semantics.
   async function rest(name?: string, args?: Record<string, unknown>) {
-    const server = createServer(service); const client = new Client({ name: 'gpt-mail-rest', version: '0.2.1' });
+    const server = createServer(service); const client = new Client({ name: 'gpt-mail-rest', version: '0.3.0' });
     const [left, right] = InMemoryTransport.createLinkedPair();
     try {
       await server.connect(right); await client.connect(left);
@@ -105,13 +118,13 @@ export async function createHttpApp(options: HttpOptions, service = new MailServ
   });
   const errors: ErrorRequestHandler = (_error, _req, res, _next) => { if (!res.headersSent) res.status(400).json({ error: 'Invalid request' }); };
   app.use(errors);
-  return { app, oauth };
+  return { app, oauth, panelStore };
 }
 
 export async function startHttp() {
   const path = process.env.MAIL_SERVER_CONFIG || join(process.cwd(), 'server', 'config.json');
   const settings = httpConfigSchema.parse(JSON.parse(await readFile(path, 'utf8')));
-  const { app } = await createHttpApp(settings);
+  const { app } = await createHttpApp(settings, undefined, undefined, { baseConfig: async () => configSchema.parse(JSON.parse(await readFile(path, 'utf8')).mail) });
   const port = Number(process.env.PORT || settings.http.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT.');
   app.listen(port, process.env.MAIL_BIND_HOST || settings.http.bindHost, () => process.stderr.write(`GptMail HTTP listening on port ${port}\n`));

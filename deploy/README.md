@@ -49,6 +49,7 @@ bash /path/to/release/deploy.sh /path/to/release
 | API Key MCP | `https://mail.example.com/mail-mcp/mcp` |
 | REST API | `https://mail.example.com/mail-mcp/api/v1` |
 | 健康检查 | `https://mail.example.com/mail-mcp/healthz` |
+| 邮箱与连接面板 | `https://mail.example.com/mail-mcp/panel/` |
 | OAuth discovery | `https://mail.example.com/.well-known/oauth-authorization-server/mail-mcp` |
 | Resource discovery | `https://mail.example.com/.well-known/oauth-protected-resource/mail-mcp` |
 | 服务代码 | `/opt/gpt-mail/current/server.cjs` |
@@ -61,6 +62,8 @@ bash /path/to/release/deploy.sh /path/to/release
 部署设置 `oauth.mcpPath` 和 `oauth.routePrefix` 为 `/mail-mcp`，`http.publicUrl` 使用私有 origin。授权、注册、换码、刷新及撤销位于前缀下，发现路径放在 origin 的 `/.well-known/` 下。
 
 ## 接入与邮箱配置
+
+可以直接打开 `/mail-mcp/panel/`，使用服务端密钥登录后添加、测试和保存邮箱。面板账号无需修改配置文件或重启服务，凭据加密保存在 `/var/lib/gpt-mail/panel/settings.enc.json`。面板静态资源已嵌入单文件运行包，现有 `/mail-mcp/` Nginx 转发规则覆盖面板及管理 API，无需增加公网端口。操作、凭据迁移和备份说明见 [面板文档](../server/panel.md)。
 
 ChatGPT 使用表中的 OAuth MCP 地址，选择 OAuth/动态客户端注册，在自己的服务器授权页输入服务端 `apiKey`。Windows 可手动运行以下脚本把密钥复制到剪贴板，脚本不在控制台打印密钥：
 

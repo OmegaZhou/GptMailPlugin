@@ -77,6 +77,8 @@ SMTP `status:accepted` 表示全部收件人被服务器接收，`partially_acce
 
 ## 开发与托管
 
+邮箱与连接网页面板位于 `/panel/`，有前缀时为 `/mail-mcp/panel/`。管理 API 使用独立所有者会话和 CSRF 校验，不通过邮件工具传递邮箱凭据。面板新增账号加密保存于状态目录，邮件工具立即读取合并后的账号列表。见 [面板说明](panel.md) 和 [管理接口定义](api/panel-openapi.json)。
+
 `server/` 中保存服务实现；`../src/index.ts` 是 HTTP 服务入口。`npm run build` 生成 `dist/server.cjs`，`npm start` 启动。`MAIL_SERVER_CONFIG` 可改变配置路径，`MAIL_STATE_DIR` 可改变发送和 OAuth 状态目录，`MAIL_BIND_HOST` 和 `PORT` 可覆盖监听地址。
 
 Docker/compose 仅提供自行托管的配置，没有自动部署。部署完成后将实际 MCP 地址填写到 `address.json` 的 `mcpUrl`、REST 根地址填写到 `apiBaseUrl`，再配置插件密钥。更换托管服务时保持本目录定义的 MCP/REST 契约即可。

@@ -1,9 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "gpt-mail",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "通用 IMAP/SMTP 邮箱：多账号、搜索、阅读、附件、草稿、发送、回复、转发和邮件整理。",
-  "author": { "name": "GptMail Contributors" },
+  "author": {
+    "name": "GptMail Contributors"
+  },
   "extensions": {
     "com.openai": {
       "interface": {
@@ -14,7 +16,11 @@
         "category": "Productivity",
         "logo": "./assets/icon.svg",
         "composerIcon": "./assets/icon.svg",
-        "defaultPrompt": ["帮我查看最近的未读邮件。", "为这封邮件起草回复。", "帮我整理收件箱。"]
+        "defaultPrompt": [
+          "帮我查看最近的未读邮件。",
+          "为这封邮件起草回复。",
+          "帮我整理收件箱。"
+        ]
       }
     }
   }

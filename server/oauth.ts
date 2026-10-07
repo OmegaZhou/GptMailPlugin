@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 export const mailScopes = ['mail.read', 'mail.write'];
 const mcpPathSchema = z.string().max(200).regex(/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+$/)
-  .refine(path => !['/mcp', '/healthz'].includes(path) && !['/authorize', '/token', '/register', '/revoke', '/oauth', '/api/v1/tools'].some(reserved => path === reserved || path.startsWith(reserved + '/')), 'OAuth MCP path conflicts with an existing endpoint');
+  .refine(path => !['/mcp', '/healthz'].includes(path) && !['/panel', '/authorize', '/token', '/register', '/revoke', '/oauth', '/api/v1/tools'].some(reserved => path === reserved || path.startsWith(reserved + '/')), 'OAuth MCP path conflicts with an existing endpoint');
 export const oauthConfigSchema = z.object({
   enabled: z.boolean().default(false),
   mcpPath: mcpPathSchema.optional(),
@@ -120,7 +120,7 @@ export class MailOAuthProvider implements OAuthServerProvider {
     res.cookie('gpt_mail_consent', nonce, { httpOnly: true, sameSite: 'strict', secure: this.issuer.protocol === 'https:', path: this.consentPath, maxAge: 300000 });
     res.setHeader('Content-Security-Policy', "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
     res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Frame-Options', 'DENY');
-    res.type('html').send(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>GptMail 授权</title><h1>连接 GptMail 邮箱</h1><p>应用：${escape(client.client_name || 'MCP 客户端')}</p><p>回调地址：${escape(params.redirectUri)}</p><p>权限：${escape(scopes.join(', '))}。授权范围包含服务端配置的全部邮箱账号。</p><p>仅在你自己的服务器域名下输入服务端 API 密钥；不要把密钥发到聊天窗口。</p><form method="post" action="${escape(this.consentPath)}"><input type="hidden" name="nonce" value="${nonce}"><label>服务端 API 密钥 <input type="password" name="apiKey" autocomplete="off" required maxlength="512"></label><p><button name="decision" value="approve">验证并授权</button> <button name="decision" value="deny" formnovalidate>取消</button></p></form></html>`);
+    res.type('html').send(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>GptMail 授权</title><h1>连接 GptMail 邮箱</h1><p>应用：${escape(client.client_name || 'MCP 客户端')}</p><p>回调地址：${escape(params.redirectUri)}</p><p>权限：${escape(scopes.join(', '))}。授权范围包含服务端配置的全部邮箱账号。</p><p>仅在你自己的服务器域名下输入服务端 API 密钥；不要把密钥发到聊天窗口。</p><p>首次使用或需要添加邮箱？<a href="${escape(this.consentPath.replace(/\/oauth\/approve$/, '') + '/panel/')}" target="_blank" rel="noopener noreferrer">打开邮箱配置面板</a>，完成后返回此页授权。</p><form method="post" action="${escape(this.consentPath)}"><input type="hidden" name="nonce" value="${nonce}"><label>服务端 API 密钥 <input type="password" name="apiKey" autocomplete="off" required maxlength="512"></label><p><button name="decision" value="approve">验证并授权</button> <button name="decision" value="deny" formnovalidate>取消</button></p></form></html>`);
   }
   consentRouter() {
     const router = express.Router();

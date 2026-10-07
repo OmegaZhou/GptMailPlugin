@@ -1,0 +1,712 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GptMail Owner Panel API",
+    "version": "0.3.0",
+    "description": "Private browser administration. Relative base is prefixed by oauth.routePrefix at deployment. Credentials are never returned to clients or exposed as MCP tools."
+  },
+  "servers": [
+    {
+      "url": "/panel/api"
+    }
+  ],
+  "security": [
+    {
+      "ownerSession": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ownerSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "gpt_mail_panel"
+      }
+    },
+    "schemas": {
+      "PanelAccount": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "imap": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "secure": {
+                "type": "boolean"
+              },
+              "user": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "credentialType": {
+                "default": "password",
+                "type": "string",
+                "enum": [
+                  "password",
+                  "accessToken"
+                ]
+              },
+              "secret": {
+                "type": "string",
+                "maxLength": 8192,
+                "writeOnly": true
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "secure",
+              "credentialType"
+            ],
+            "additionalProperties": false
+          },
+          "smtp": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "secure": {
+                "type": "boolean"
+              },
+              "user": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "credentialType": {
+                "default": "password",
+                "type": "string",
+                "enum": [
+                  "password",
+                  "accessToken"
+                ]
+              },
+              "secret": {
+                "type": "string",
+                "maxLength": 8192,
+                "writeOnly": true
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "secure",
+              "credentialType"
+            ],
+            "additionalProperties": false
+          },
+          "folders": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "drafts": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "sent": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "trash": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "archive": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "additionalProperties": false
+          },
+          "saveSent": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "imap",
+          "smtp",
+          "folders",
+          "saveSent"
+        ],
+        "additionalProperties": false,
+        "description": "New accounts require secrets for both endpoints. Empty secrets on edits preserve credentials only when the target and credential type stay unchanged."
+      },
+      "Connection": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "mcpUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "format": "uri"
+          },
+          "authType": {
+            "type": "string",
+            "enum": [
+              "oauth",
+              "apiKey"
+            ]
+          }
+        },
+        "required": [
+          "mcpUrl",
+          "authType"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/session": {
+      "post": {
+        "operationId": "panel_login",
+        "summary": "Log in with the existing server key",
+        "security": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 512,
+                    "writeOnly": true
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "csrf": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "csrf"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "panel_logout",
+        "summary": "End the owner session",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/state": {
+      "get": {
+        "operationId": "panel_state",
+        "summary": "Get client settings, redacted accounts, endpoints and session CSRF value",
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/connection": {
+      "put": {
+        "operationId": "panel_connection",
+        "summary": "Save client MCP URL and authentication mode",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Connection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "post": {
+        "operationId": "panel_save_account",
+        "summary": "Add or update a panel-managed mailbox without restarting",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "delete": {
+        "operationId": "panel_delete_account",
+        "summary": "Remove a panel-managed connection without deleting mail",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/default": {
+      "put": {
+        "operationId": "panel_default",
+        "summary": "Select a default mailbox",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    },
+    "/test": {
+      "post": {
+        "operationId": "panel_test",
+        "summary": "Check IMAP and SMTP authentication; never send mail or persist input",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact panel origin"
+          },
+          {
+            "in": "header",
+            "name": "X-Panel-CSRF",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "account": {
+                        "$ref": "#/components/schemas/PanelAccount"
+                      }
+                    },
+                    "required": [
+                      "account"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no mailbox credentials or server key in response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imap": {
+                      "type": "boolean"
+                    },
+                    "smtp": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "imap",
+                    "smtp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration"
+          },
+          "401": {
+            "description": "Owner session required"
+          },
+          "403": {
+            "description": "Origin or CSRF validation failed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Safe generic server error"
+          }
+        }
+      }
+    }
+  }
+}

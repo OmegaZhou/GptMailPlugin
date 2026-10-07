@@ -1,8 +1,10 @@
 {
   "name": "gpt-mail",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "通用 IMAP/SMTP 邮箱搜索、收发与整理。",
-  "author": { "name": "GptMail Contributors" },
+  "author": {
+    "name": "GptMail Contributors"
+  },
   "skills": "./skills/",
   "mcpServers": "./mcp.json",
   "interface": {
@@ -13,6 +15,10 @@
     "category": "Productivity",
     "logo": "./assets/icon.svg",
     "composerIcon": "./assets/icon.svg",
-    "defaultPrompt": ["帮我查看最近的未读邮件。", "为这封邮件起草回复。", "帮我整理收件箱。"]
+    "defaultPrompt": [
+      "帮我查看最近的未读邮件。",
+      "为这封邮件起草回复。",
+      "帮我整理收件箱。"
+    ]
   }
 }

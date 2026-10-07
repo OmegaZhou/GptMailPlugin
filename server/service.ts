@@ -15,12 +15,12 @@ export class MailService {
     private imapFactory: (a: Account) => ImapFlow = a => {
       const ep = a.imap;
       return new ImapFlow({ host: ep.host, port: ep.port, secure: ep.secure,
-        ...(ep.secure ? {} : { doSTARTTLS: true }), auth: credentials(a, 'imap'), logger: false,
+        ...(ep.secure ? {} : { doSTARTTLS: true }), auth: this.credentialProvider(a, 'imap'), logger: false,
         tls: { rejectUnauthorized: true }, disableAutoIdle: true,
         connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000 });
     },
     private smtpFactory = (a: Account) => {
-      const ep = a.smtp; const auth = credentials(a, 'smtp');
+      const ep = a.smtp; const auth = this.credentialProvider(a, 'smtp');
       return nodemailer.createTransport({ host: ep.host, port: ep.port, secure: ep.secure,
         requireTLS: !ep.secure, tls: { rejectUnauthorized: true },
         auth: 'accessToken' in auth ? { type: 'OAuth2', user: auth.user, accessToken: auth.accessToken } : auth,
@@ -28,6 +28,7 @@ export class MailService {
         disableFileAccess: true, disableUrlAccess: true });
     },
     private journal = new SendJournal(process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state')),
+    private credentialProvider: typeof credentials = credentials,
   ) {}
   async accounts() {
     const c = await this.config();

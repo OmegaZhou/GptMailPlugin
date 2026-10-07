@@ -49,6 +49,7 @@ credentials/
 *.sqlite-*
 *.db
 *.db-*
+*.enc.json
 
 # Logs, caches and local backups
 *.log
