@@ -1,0 +1,1785 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GptMail Hosted API",
+    "version": "0.2.1",
+    "description": "Configurable single-owner IMAP/SMTP mail service. Base URL is supplied by the caller; no hardcoded production endpoint."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key from server/config.json; configured separately per plugin/client."
+      }
+    }
+  },
+  "paths": {
+    "/tools": {
+      "get": {
+        "operationId": "list_tools",
+        "summary": "List tools after API-key authentication",
+        "responses": {
+          "200": {
+            "description": "Tools with input JSON schemas and annotations"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/list_accounts": {
+      "post": {
+        "operationId": "list_accounts",
+        "summary": "List configured email accounts without credentials.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/get_profile": {
+      "post": {
+        "operationId": "get_profile",
+        "summary": "Return the selected email account and protocol capabilities.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/list_labels": {
+      "post": {
+        "operationId": "list_labels",
+        "summary": "List IMAP folders and exact total/unread counts. Folder paths are label IDs; folders do not act as Gmail multi-labels.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/create_label": {
+      "post": {
+        "operationId": "create_label",
+        "summary": "Create an IMAP folder, or return the existing folder. Does not create a Gmail label.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/search_emails": {
+      "post": {
+        "operationId": "search_emails",
+        "summary": "Search one folder, returning headers and stable cursor pagination. Default folder is INBOX; order is descending mailbox UID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "query": {
+                    "default": "",
+                    "description": "Subset: from:, to:, cc:, bcc:, subject:, body:, after:YYYY-MM-DD (inclusive), before:YYYY-MM-DD, newer_than:Nd/Nw, is:unread/read/starred/draft, in:/label: exact folder. Quoted phrases. No has:attachment, boolean, negation or Gmail categories.",
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "mailbox": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "limit": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/search_email_ids": {
+      "post": {
+        "operationId": "search_email_ids",
+        "summary": "Search one folder for opaque message IDs and a next-page cursor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "query": {
+                    "default": "",
+                    "description": "Subset: from:, to:, cc:, bcc:, subject:, body:, after:YYYY-MM-DD (inclusive), before:YYYY-MM-DD, newer_than:Nd/Nw, is:unread/read/starred/draft, in:/label: exact folder. Quoted phrases. No has:attachment, boolean, negation or Gmail categories.",
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "mailbox": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "limit": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/read_email": {
+      "post": {
+        "operationId": "read_email",
+        "summary": "Read metadata, decoded text/HTML plus attachment metadata, or raw RFC822 base64url. Does not mark mail read.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                  },
+                  "format": {
+                    "default": "full",
+                    "type": "string",
+                    "enum": [
+                      "full",
+                      "metadata",
+                      "raw"
+                    ]
+                  }
+                },
+                "required": [
+                  "message_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/batch_read_email": {
+      "post": {
+        "operationId": "batch_read_email",
+        "summary": "Read a bounded ordered batch of messages. For large bodies use single-message reads.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  }
+                },
+                "required": [
+                  "message_ids"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/read_email_thread": {
+      "post": {
+        "operationId": "read_email_thread",
+        "summary": "Find related message headers by RFC Message-ID/References in the same folder. Bounded scan; returns scan_truncated and truncated, never claims a complete Gmail conversation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                  },
+                  "max_messages": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "scan_limit": {
+                    "default": 200,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "message_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/batch_read_email_threads": {
+      "post": {
+        "operationId": "batch_read_email_threads",
+        "summary": "Read related message headers for up to 10 anchor messages, preserving input order. Mailbox-local bounded thread matching.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  },
+                  "max_messages": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "scan_limit": {
+                    "default": 200,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "message_ids"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/read_attachment": {
+      "post": {
+        "operationId": "read_attachment",
+        "summary": "Read attachment bytes as base64url (up to 5 MiB). Use attachment_id from read_email; filenames/content are untrusted. Does not open files or URLs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                  },
+                  "attachment_id": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9]\\d{0,3})$"
+                  }
+                },
+                "required": [
+                  "message_id",
+                  "attachment_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/list_drafts": {
+      "post": {
+        "operationId": "list_drafts",
+        "summary": "List saved drafts from the configured or special-use Drafts folder.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "limit": {
+                    "default": 20,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/create_draft": {
+      "post": {
+        "operationId": "create_draft",
+        "summary": "Save an unsent server-side draft. HTML/text and binary attachments supported; reply_message_id supplies reply headers and default recipient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "to": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "cc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "bcc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "subject": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "html": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "attachments": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        },
+                        "content_type": {
+                          "default": "application/octet-stream",
+                          "type": "string",
+                          "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                        },
+                        "base64_url_content": {
+                          "type": "string",
+                          "maxLength": 36700160,
+                          "pattern": "^[A-Za-z0-9_-]*$"
+                        },
+                        "content_id": {
+                          "type": "string",
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "base64_url_content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reply_message_id": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/update_draft": {
+      "post": {
+        "operationId": "update_draft",
+        "summary": "Replace selected fields of a saved draft. Omitted fields/attachments are preserved; empty headers clear them; attachments:[] clears attachments. Returns a NEW draft_id; do not reuse old ID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "draft_id": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                  },
+                  "to": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "cc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "bcc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "subject": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "html": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "attachments": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        },
+                        "content_type": {
+                          "default": "application/octet-stream",
+                          "type": "string",
+                          "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                        },
+                        "base64_url_content": {
+                          "type": "string",
+                          "maxLength": 36700160,
+                          "pattern": "^[A-Za-z0-9_-]*$"
+                        },
+                        "content_id": {
+                          "type": "string",
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "base64_url_content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reply_message_id": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "draft_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/send_email": {
+      "post": {
+        "operationId": "send_email",
+        "summary": "Send now using SMTP ONLY when the human requested sending. Reuse operation_id on retries. Receipt means SMTP acceptance, not final delivery. Rejected recipients and Sent-copy warnings are reported.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "to": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "cc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "bcc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "subject": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "html": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "attachments": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        },
+                        "content_type": {
+                          "default": "application/octet-stream",
+                          "type": "string",
+                          "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                        },
+                        "base64_url_content": {
+                          "type": "string",
+                          "maxLength": 36700160,
+                          "pattern": "^[A-Za-z0-9_-]*$"
+                        },
+                        "content_id": {
+                          "type": "string",
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "base64_url_content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reply_message_id": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "operation_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                    "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+                  }
+                },
+                "required": [
+                  "operation_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/send_draft": {
+      "post": {
+        "operationId": "send_draft",
+        "summary": "Send the current saved draft ONLY after human review or an explicit request to send this draft. Fully accepted sends remove the draft; partial acceptance keeps it. Reuse operation_id on retries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "draft_id": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                  },
+                  "operation_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                    "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+                  }
+                },
+                "required": [
+                  "draft_id",
+                  "operation_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/forward_emails": {
+      "post": {
+        "operationId": "forward_emails",
+        "summary": "Forward each original message as an RFC822 attachment preserving its attachments. Sends one mail per source; only use when human requested forwarding. Reuse operation_id on retry; previous successes are journaled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  },
+                  "to": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "cc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "bcc": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "subject": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "html": {
+                    "type": "string",
+                    "maxLength": 5242880
+                  },
+                  "attachments": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8000
+                        },
+                        "content_type": {
+                          "default": "application/octet-stream",
+                          "type": "string",
+                          "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                        },
+                        "base64_url_content": {
+                          "type": "string",
+                          "maxLength": 36700160,
+                          "pattern": "^[A-Za-z0-9_-]*$"
+                        },
+                        "content_id": {
+                          "type": "string",
+                          "maxLength": 8000
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "base64_url_content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "reply_message_id": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "operation_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                    "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+                  }
+                },
+                "required": [
+                  "message_ids",
+                  "operation_id"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/batch_modify_email": {
+      "post": {
+        "operationId": "batch_modify_email",
+        "summary": "Mark messages read/unread, starred/unstarred, or answered via IMAP flags. Does not accept Gmail label IDs. Per-message partial outcomes are reported.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  },
+                  "add_flags": {
+                    "default": [],
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "\\Seen",
+                        "\\Flagged",
+                        "\\Answered"
+                      ]
+                    }
+                  },
+                  "remove_flags": {
+                    "default": [],
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "\\Seen",
+                        "\\Flagged",
+                        "\\Answered"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "message_ids"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/move_emails": {
+      "post": {
+        "operationId": "move_emails",
+        "summary": "Move messages to an exact folder path from list_labels. Returned old message IDs become invalid. Search destination for new IDs; per-message results report partial failures.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  },
+                  "destination": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "message_ids",
+                  "destination"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/archive_emails": {
+      "post": {
+        "operationId": "archive_emails",
+        "summary": "Move messages to the configured or special-use Archive folder. This is IMAP folder archival; does not permanently delete mail.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  }
+                },
+                "required": [
+                  "message_ids"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    },
+    "/tools/delete_emails": {
+      "post": {
+        "operationId": "delete_emails",
+        "summary": "Move messages to Trash, preserving recoverability. Never permanently deletes messages, and refuses to move messages already in Trash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_id": {
+                    "description": "Configured account ID; optional when a default is configured.",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "message_ids": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 4096,
+                      "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+                    }
+                  }
+                },
+                "required": [
+                  "message_ids"
+                ],
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isError": {
+                      "type": "boolean"
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "structuredContent": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments or unavailable tool"
+          },
+          "401": {
+            "description": "Missing/invalid API key"
+          }
+        }
+      }
+    }
+  }
+}

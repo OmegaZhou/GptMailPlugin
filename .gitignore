@@ -1,0 +1,66 @@
+# Dependencies, build output and release archives
+node_modules/
+/dist/
+/artifacts/
+/coverage/
+*.tsbuildinfo
+
+# Private environment files; retain templates
+.env
+.env.*
+*.env
+!.env.example
+!.env.*.example
+!*.env.example
+
+# Runtime server/client configuration; retain example files
+/server/config.json
+/server/config.*.json
+!/server/config.example.json
+/server/address.json
+/server/address.*.json
+!/server/address.example.json
+/server/settings.json
+/config/plugin.json
+/config/plugin.*.json
+!/config/plugin.example.json
+!/config/plugin.oauth.example.json
+/mcp.json
+/mcp.local.json
+accounts.json
+
+# OAuth grants, SMTP journal, mail data and credentials
+state/
+send-journal/
+oauth/state.json
+server/oauth.json
+.secrets/
+secrets/
+.credentials/
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+*.eml
+*.msg
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+
+# Logs, caches and local backups
+*.log
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.tmp
+*.bak
+*.orig
+*.swp
+*.swo
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

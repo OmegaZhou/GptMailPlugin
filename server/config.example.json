@@ -1,0 +1,27 @@
+{
+  "apiKey": "",
+  "oauth": {
+    "enabled": false,
+    "mcpPath": "/chatgpt/mcp",
+    "routePrefix": "",
+    "redirectOrigins": ["https://chatgpt.com", "https://chat.openai.com"]
+  },
+  "http": {
+    "bindHost": "127.0.0.1",
+    "port": 3000,
+    "trustProxy": 0,
+    "allowedOrigins": []
+  },
+  "mail": {
+    "defaultAccount": "qq",
+    "accounts": [
+      {
+        "id": "qq", "email": "your-number@qq.com",
+        "imap": { "host": "imap.qq.com", "port": 993, "secure": true, "passwordEnv": "QQ_MAIL_PASSWORD" },
+        "smtp": { "host": "smtp.qq.com", "port": 465, "secure": true, "passwordEnv": "QQ_MAIL_PASSWORD" },
+        "saveSent": true
+      }
+    ],
+    "maxMessageBytes": 26214400
+  }
+}

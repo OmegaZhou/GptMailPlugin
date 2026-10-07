@@ -1,0 +1,42 @@
+{
+  "name": "gpt-mail-plugin",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "start": "node dist/server.cjs",
+    "dev": "tsx src/index.ts",
+    "test": "tsx --test test/*.test.ts",
+    "check": "tsc --noEmit",
+    "api": "tsx scripts/export-api.ts",
+    "configure:plugin": "node scripts/configure-plugin.mjs",
+    "package": "node scripts/package.mjs",
+    "start:http": "node dist/server.cjs",
+    "release:server": "npm run build && node scripts/release.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "imapflow": "^2.2.7",
+    "mailparser": "^3.9.0",
+    "nodemailer": "^10.0.15",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/mailparser": "^3.4.6",
+    "@types/node": "^24.0.0",
+    "@types/nodemailer": "^7.0.0",
+    "@types/smtp-server": "^3.5.0",
+    "esbuild": "^0.27.0",
+    "fflate": "^0.8.2",
+    "smtp-server": "^3.16.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

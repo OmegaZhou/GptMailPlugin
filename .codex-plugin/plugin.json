@@ -1,0 +1,18 @@
+{
+  "name": "gpt-mail",
+  "version": "0.2.1",
+  "description": "通用 IMAP/SMTP 邮箱搜索、收发与整理。",
+  "author": { "name": "GptMail Contributors" },
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "GptMail",
+    "shortDescription": "多账号邮箱搜索、收发与整理",
+    "longDescription": "通过可配置的托管服务连接 QQ、163 和企业 IMAP/SMTP 邮箱，支持 API 密钥与 ChatGPT OAuth 认证。",
+    "developerName": "GptMail Contributors",
+    "category": "Productivity",
+    "logo": "./assets/icon.svg",
+    "composerIcon": "./assets/icon.svg",
+    "defaultPrompt": ["帮我查看最近的未读邮件。", "为这封邮件起草回复。", "帮我整理收件箱。"]
+  }
+}

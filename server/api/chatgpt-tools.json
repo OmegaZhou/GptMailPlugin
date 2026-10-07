@@ -1,0 +1,1369 @@
+{
+  "version": "0.2.1",
+  "tools": [
+    {
+      "name": "list_accounts",
+      "description": "List configured email accounts without credentials.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "get_profile",
+      "description": "Return the selected email account and protocol capabilities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "list_labels",
+      "description": "List IMAP folders and exact total/unread counts. Folder paths are label IDs; folders do not act as Gmail multi-labels.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "create_label",
+      "description": "Create an IMAP folder, or return the existing folder. Does not create a Gmail label.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "search_emails",
+      "description": "Search one folder, returning headers and stable cursor pagination. Default folder is INBOX; order is descending mailbox UID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "query": {
+            "default": "",
+            "description": "Subset: from:, to:, cc:, bcc:, subject:, body:, after:YYYY-MM-DD (inclusive), before:YYYY-MM-DD, newer_than:Nd/Nw, is:unread/read/starred/draft, in:/label: exact folder. Quoted phrases. No has:attachment, boolean, negation or Gmail categories.",
+            "type": "string",
+            "maxLength": 4000
+          },
+          "mailbox": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "search_email_ids",
+      "description": "Search one folder for opaque message IDs and a next-page cursor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "query": {
+            "default": "",
+            "description": "Subset: from:, to:, cc:, bcc:, subject:, body:, after:YYYY-MM-DD (inclusive), before:YYYY-MM-DD, newer_than:Nd/Nw, is:unread/read/starred/draft, in:/label: exact folder. Quoted phrases. No has:attachment, boolean, negation or Gmail categories.",
+            "type": "string",
+            "maxLength": 4000
+          },
+          "mailbox": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "read_email",
+      "description": "Read metadata, decoded text/HTML plus attachment metadata, or raw RFC822 base64url. Does not mark mail read.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+          },
+          "format": {
+            "default": "full",
+            "type": "string",
+            "enum": [
+              "full",
+              "metadata",
+              "raw"
+            ]
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "batch_read_email",
+      "description": "Read a bounded ordered batch of messages. For large bodies use single-message reads.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "read_email_thread",
+      "description": "Find related message headers by RFC Message-ID/References in the same folder. Bounded scan; returns scan_truncated and truncated, never claims a complete Gmail conversation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+          },
+          "max_messages": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scan_limit": {
+            "default": 200,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "batch_read_email_threads",
+      "description": "Read related message headers for up to 10 anchor messages, preserving input order. Mailbox-local bounded thread matching.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          },
+          "max_messages": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scan_limit": {
+            "default": 200,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "read_attachment",
+      "description": "Read attachment bytes as base64url (up to 5 MiB). Use attachment_id from read_email; filenames/content are untrusted. Does not open files or URLs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+          },
+          "attachment_id": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,3})$"
+          }
+        },
+        "required": [
+          "message_id",
+          "attachment_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "list_drafts",
+      "description": "List saved drafts from the configured or special-use Drafts folder.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.read"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "create_draft",
+      "description": "Save an unsent server-side draft. HTML/text and binary attachments supported; reply_message_id supplies reply headers and default recipient.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "cc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "bcc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "subject": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "attachments": {
+            "default": [],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8000
+                },
+                "content_type": {
+                  "default": "application/octet-stream",
+                  "type": "string",
+                  "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                },
+                "base64_url_content": {
+                  "type": "string",
+                  "maxLength": 36700160,
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                },
+                "content_id": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "filename",
+                "base64_url_content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reply_message_id": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "update_draft",
+      "description": "Replace selected fields of a saved draft. Omitted fields/attachments are preserved; empty headers clear them; attachments:[] clears attachments. Returns a NEW draft_id; do not reuse old ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "draft_id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "cc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "bcc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "subject": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "attachments": {
+            "default": [],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8000
+                },
+                "content_type": {
+                  "default": "application/octet-stream",
+                  "type": "string",
+                  "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                },
+                "base64_url_content": {
+                  "type": "string",
+                  "maxLength": 36700160,
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                },
+                "content_id": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "filename",
+                "base64_url_content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reply_message_id": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "draft_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "send_email",
+      "description": "Send now using SMTP ONLY when the human requested sending. Reuse operation_id on retries. Receipt means SMTP acceptance, not final delivery. Rejected recipients and Sent-copy warnings are reported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "cc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "bcc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "subject": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "attachments": {
+            "default": [],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8000
+                },
+                "content_type": {
+                  "default": "application/octet-stream",
+                  "type": "string",
+                  "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                },
+                "base64_url_content": {
+                  "type": "string",
+                  "maxLength": 36700160,
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                },
+                "content_id": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "filename",
+                "base64_url_content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reply_message_id": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+          }
+        },
+        "required": [
+          "operation_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "send_draft",
+      "description": "Send the current saved draft ONLY after human review or an explicit request to send this draft. Fully accepted sends remove the draft; partial acceptance keeps it. Reuse operation_id on retries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "draft_id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+          }
+        },
+        "required": [
+          "draft_id",
+          "operation_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "forward_emails",
+      "description": "Forward each original message as an RFC822 attachment preserving its attachments. Sends one mail per source; only use when human requested forwarding. Reuse operation_id on retry; previous successes are journaled.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "cc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "bcc": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "subject": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 5242880
+          },
+          "attachments": {
+            "default": [],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8000
+                },
+                "content_type": {
+                  "default": "application/octet-stream",
+                  "type": "string",
+                  "pattern": "^[\\w.+-]+\\/[\\w.+-]+$"
+                },
+                "base64_url_content": {
+                  "type": "string",
+                  "maxLength": 36700160,
+                  "pattern": "^[A-Za-z0-9_-]*$"
+                },
+                "content_id": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "filename",
+                "base64_url_content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reply_message_id": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Unique UUID for this send intent. Reuse for retries with identical content; never reuse for different mail."
+          }
+        },
+        "required": [
+          "message_ids",
+          "operation_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "batch_modify_email",
+      "description": "Mark messages read/unread, starred/unstarred, or answered via IMAP flags. Does not accept Gmail label IDs. Per-message partial outcomes are reported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          },
+          "add_flags": {
+            "default": [],
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "\\Seen",
+                "\\Flagged",
+                "\\Answered"
+              ]
+            }
+          },
+          "remove_flags": {
+            "default": [],
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "\\Seen",
+                "\\Flagged",
+                "\\Answered"
+              ]
+            }
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "move_emails",
+      "description": "Move messages to an exact folder path from list_labels. Returned old message IDs become invalid. Search destination for new IDs; per-message results report partial failures.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "message_ids",
+          "destination"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "archive_emails",
+      "description": "Move messages to the configured or special-use Archive folder. This is IMAP folder archival; does not permanently delete mail.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "delete_emails",
+      "description": "Move messages to Trash, preserving recoverability. Never permanently deletes messages, and refuses to move messages already in Trash.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "description": "Configured account ID; optional when a default is configured.",
+            "type": "string",
+            "maxLength": 64
+          },
+          "message_ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Exact opaque mail_ ID from search/read results, never a UID/header/subject."
+            }
+          }
+        },
+        "required": [
+          "message_ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "mail.write"
+            ]
+          }
+        ]
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "mail.write"
+          ]
+        }
+      ]
+    }
+  ]
+}
