@@ -1,6 +1,5 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { timingSafeEqual, createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -12,28 +11,32 @@ import { createServer } from './server.js';
 import { MailService } from './service.js';
 import { configSchema } from './config.js';
 import type { Config } from './config.js';
-import { PanelStore } from './panel-store.js';
-import { panelRouter, type ConnectionVerifier } from './panel.js';
-import { MailOAuthProvider, oauthConfigSchema } from './oauth.js';
+import { SettingsStore } from './settings-store.js';
+import type { ConnectionVerifier } from './mailbox-verifier.js';
+import { SettingsController } from './settings-ui.js';
+import { oauthConfigSchema } from './oauth.js';
+import { ExternalTokenVerifier } from './external-auth.js';
+import type { JWTVerifyGetKey } from 'jose';
 import { mailOAuthRouter } from './oauth-router.js';
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 
 export const httpConfigSchema = z.object({
-  apiKey: z.string().min(32).max(512).refine(key => !/[\r\n\0]/.test(key), 'Key must be a valid Authorization header value'),
+  storageKey: z.string().min(32).max(512),
   http: z.object({
     bindHost: z.string().default('127.0.0.1'), port: z.number().int().min(1).max(65535).default(3000),
     publicUrl: z.url().optional(), trustProxy: z.union([z.literal(0), z.literal(1)]).default(0),
     allowedOrigins: z.array(z.url()).default([]),
   }).default({ bindHost: '127.0.0.1', port: 3000, trustProxy: 0, allowedOrigins: [] }),
   mail: configSchema,
-  oauth: oauthConfigSchema.optional(),
+  oauth: oauthConfigSchema,
 }).strict();
 export type HttpOptions = z.infer<typeof httpConfigSchema>;
-const digest = (key: string) => createHash('sha256').update(key).digest();
+
 
 export async function createHttpApp(options: HttpOptions, service?: MailService, oauthStateDirectory?: string,
-  panelOptions?: { directory?: string; baseConfig?: () => Promise<Config>; verify?: ConnectionVerifier }) {
+  settingsOptions?: { directory?: string; baseConfig?: () => Promise<Config>; verify?: ConnectionVerifier },
+  authKeyResolver?: JWTVerifyGetKey) {
   const settings = httpConfigSchema.parse(options);
   const { http } = settings;
   const prefix = settings.oauth?.routePrefix || '';
@@ -41,10 +44,10 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   if (base && (base.pathname !== '/' || base.search || base.hash || base.username || base.password ||
     (base.protocol !== 'https:' && !(base.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname))))) throw new Error('publicUrl must be an HTTPS origin (HTTP only on loopback).');
   const app = express(); app.disable('x-powered-by');
-  const panelStore = await new PanelStore(panelOptions?.directory || join(oauthStateDirectory ||
-    process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state'), 'panel'), settings.apiKey,
-    panelOptions?.baseConfig || (async () => settings.mail)).init();
-  service ||= new MailService(() => panelStore.mail(), undefined, undefined, undefined, (account, kind) => panelStore.credentials(account, kind));
+  const settingsStore = await new SettingsStore(settingsOptions?.directory || join(oauthStateDirectory ||
+    process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state'), 'panel'), settings.storageKey,
+    settingsOptions?.baseConfig || (async () => settings.mail)).init();
+  service ||= new MailService(() => settingsStore.mail(), undefined, undefined, undefined, (account, kind) => settingsStore.credentials(account, kind));
   if (http.trustProxy) app.set('trust proxy', http.trustProxy);
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -64,61 +67,69 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   });
   app.get(['/healthz', ...(prefix ? [prefix + '/healthz'] : [])], (_req, res) => res.json({ status: 'ok' }));
   app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: true, legacyHeaders: false }));
-  app.get(`${prefix}/panel`, (req, res, next) => { if (req.path === `${prefix}/panel`) res.redirect(303, `${prefix}/panel/`); else next(); });
-  app.use(`${prefix}/panel/`, panelRouter(panelStore, settings.apiKey, prefix, base?.origin,
-    settings.oauth?.enabled ? settings.oauth.mcpPath || '/chatgpt/mcp' : `${prefix}/mcp`, settings.oauth?.enabled ? 'oauth' : 'apiKey', panelOptions?.verify));
-  async function handleMcp(req: express.Request, res: express.Response, oauth?: { scopes: string[]; metadataUrl: string }) {
+  // No website or management REST endpoints. Configuration is an MCP App inside the plugin.
+  app.use((req, res, next) => {
+    if (/^(?:\/mail-mcp)?\/panel(?:\/|$)/.test(req.path) || req.path === `${prefix}/panel` || req.path.startsWith(`${prefix}/panel/`)) {
+      res.status(404).json({ error: 'Not found' }); return;
+    }
+    next();
+  });
+  const settingsUi = new SettingsController(settingsStore, base?.origin || `http://localhost:${http.port}`,
+    settings.oauth.mcpPath || '/chatgpt/mcp',
+    'oauth', settingsOptions?.verify);
+  async function handleMcp(req: express.Request, res: express.Response, oauth: { scopes: string[]; metadataUrl: string }) {
     if (req.method !== 'POST') { res.status(405).setHeader('Allow', 'POST'); res.end(); return; }
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true,
       ...(base ? { enableDnsRebindingProtection: true, allowedHosts: [base.host], allowedOrigins: [base.origin, ...http.allowedOrigins] } : {}) });
-    const server = createServer(service!, oauth);
+    const ownerId = String(req.auth!.extra!.ownerId);
+    const server = createServer(service!, { ...oauth, profile: async () => ({ id: 'owner_' + ownerId, name: 'GptMail', nickname: '在插件面板中管理邮箱' }) }, { controller: settingsUi,
+      identity: { binding: ownerId, canWrite: oauth.scopes.includes('mail.write'), verifiedOwner: true,
+        accountName: String(req.auth!.extra!.accountName) } });
+    // SDK 1.x omits unknown tool fields; preserve the OAuth compatibility metadata on the wire.
+    const send = transport.send.bind(transport);
+    transport.send = async (message, options) => {
+      if ('result' in message && message.result && typeof message.result === 'object' && 'tools' in message.result && Array.isArray(message.result.tools))
+        message.result.tools = message.result.tools.map((tool: any) => tool._meta?.securitySchemes ? { ...tool, securitySchemes: tool._meta.securitySchemes } : tool);
+      await send(message, options);
+    };
     res.on('close', () => { void transport.close(); void server.close(); });
     try { await server.connect(transport); await transport.handleRequest(req, res, req.body); }
     catch { if (!res.headersSent) res.status(500).json({ error: 'MCP request failed' }); }
   }
-  let oauth: MailOAuthProvider | undefined;
-  if (settings.oauth?.enabled) {
-    if (!base) throw new Error('OAuth requires http.publicUrl: the publicly reachable HTTPS origin.');
-    const issuer = new URL(prefix || '/', base);
-    oauth = await new MailOAuthProvider(issuer, settings.apiKey, settings.oauth.redirectOrigins, oauthStateDirectory, undefined, settings.oauth.mcpPath, prefix).init();
-    const metadataUrl = getOAuthProtectedResourceMetadataUrl(oauth.resource);
-    app.use(mailOAuthRouter(oauth, prefix));
-    app.all(oauth.resource.pathname, requireBearerAuth({ verifier: oauth, expectedResource: oauth.resource, resourceMetadataUrl: metadataUrl }),
-      express.json({ limit: '40mb' }), (req, res) => handleMcp(req, res, { scopes: req.auth!.scopes, metadataUrl }));
-  } else app.all(settings.oauth?.mcpPath || '/chatgpt/mcp', (_req, res) => { res.status(404).json({ error: 'ChatGPT adapter is disabled' }); });
-  // Authenticate before parsing potentially large email bodies.
-  const expected = digest(settings.apiKey);
-  app.use((req, res, next) => {
-    const header = req.headers.authorization;
-    const key = header?.startsWith('Bearer ') ? header.slice(7) : '';
-    if (!key || key.length > 512 || !timingSafeEqual(digest(key), expected)) {
-      res.status(401).setHeader('WWW-Authenticate', 'Bearer realm="GptMail"'); res.json({ error: 'unauthorized' }); return;
-    }
-    next();
-  });
+  if (!base) throw new Error('Authentication requires http.publicUrl.');
+  const provider = settings.oauth.provider;
+  const resource = new URL(settings.oauth.mcpPath || '/chatgpt/mcp', base);
+  if (provider.resource !== resource.href) throw new Error('OAuth resource must match the public MCP endpoint.');
+  const oauth = new ExternalTokenVerifier(provider, authKeyResolver);
+  const metadataUrl = getOAuthProtectedResourceMetadataUrl(resource);
+  app.use(mailOAuthRouter(provider));
+  app.all([`${prefix}/authorize`, `${prefix}/token`, `${prefix}/register`, `${prefix}/revoke`, `${prefix}/oauth/approve`],
+    (_req, res) => { res.status(404).json({ error: 'Authentication is provided by the configured account service.' }); });
+  // All protected routes share token verification, before parsing email bodies.
+  app.use(requireBearerAuth({ verifier: oauth, expectedResource: resource, resourceMetadataUrl: metadataUrl }));
   app.use(express.json({ limit: '40mb' }));
-  app.all(['/mcp', ...(prefix ? [prefix + '/mcp'] : [])], (req, res) => handleMcp(req, res));
+  app.all([resource.pathname, '/mcp', ...(prefix ? [prefix + '/mcp'] : [])], (req, res) => handleMcp(req, res, { scopes: req.auth!.scopes, metadataUrl }));
   // REST uses the exact same MCP validation and handlers; no duplicate mail semantics.
-  async function rest(name?: string, args?: Record<string, unknown>) {
-    const server = createServer(service); const client = new Client({ name: 'gpt-mail-rest', version: '0.3.0' });
+  async function rest(req: express.Request, name?: string, args?: Record<string, unknown>) {
+    const server = createServer(service, { scopes: req.auth!.scopes, metadataUrl }); const client = new Client({ name: 'gpt-mail-rest', version: '0.5.0' });
     const [left, right] = InMemoryTransport.createLinkedPair();
     try {
       await server.connect(right); await client.connect(left);
       return name ? await client.callTool({ name, arguments: args }) : await client.listTools();
     } finally { await client.close(); await server.close(); }
   }
-  app.get(['/api/v1/tools', ...(prefix ? [prefix + '/api/v1/tools'] : [])], async (_req, res) => {
-    try { res.json(await rest()); }
+  app.get(['/api/v1/tools', ...(prefix ? [prefix + '/api/v1/tools'] : [])], async (req, res) => {
+    try { res.json(await rest(req)); }
     catch { res.status(500).json({ error: 'Tool discovery failed' }); }
   });
   app.post(['/api/v1/tools/:name', ...(prefix ? [prefix + '/api/v1/tools/:name'] : [])], async (req, res) => {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) { res.status(400).json({ error: 'Supply a JSON arguments object' }); return; }
-    try { res.json(await rest(String(req.params.name), req.body)); }
+    try { res.json(await rest(req, String(req.params.name), req.body)); }
     catch { res.status(400).json({ error: 'Unknown tool or invalid arguments' }); }
   });
   const errors: ErrorRequestHandler = (_error, _req, res, _next) => { if (!res.headersSent) res.status(400).json({ error: 'Invalid request' }); };
   app.use(errors);
-  return { app, oauth, panelStore };
+  return { app, oauth, settingsStore };
 }
 
 export async function startHttp() {

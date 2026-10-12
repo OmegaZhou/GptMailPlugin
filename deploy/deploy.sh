@@ -14,6 +14,29 @@ print(u.hostname)
 PY
 )"
 PUBLIC_ORIGIN="${PUBLIC_ORIGIN%/}"
+AUTH_PROVIDER_CONFIG="${MAIL_AUTH_PROVIDER_CONFIG:?Set MAIL_AUTH_PROVIDER_CONFIG to the private external authentication settings file}"
+# Validate the replacement authentication before changing the running application.
+python3 - "$AUTH_PROVIDER_CONFIG" "$PUBLIC_ORIGIN" <<'PY'
+import json, pathlib, sys, urllib.parse, urllib.request
+provider = json.loads(pathlib.Path(sys.argv[1]).read_text())
+required = {"issuer", "jwksUrl", "resource", "clientId", "allowedSubjects"}
+assert required <= set(provider) <= required | {"accountNames"}, "Invalid authentication provider fields"
+names = provider.get("accountNames", {})
+assert isinstance(names, dict) and all(k in provider["allowedSubjects"] and isinstance(v, str) and 0 < len(v.strip()) <= 100 for k, v in names.items()), "Invalid account display names"
+for name in ("issuer", "jwksUrl", "resource"):
+    u = urllib.parse.urlsplit(provider[name])
+    assert u.scheme == "https" and u.netloc and not u.username and not u.password and not u.query and not u.fragment, "Invalid authentication endpoint"
+assert provider["resource"] == sys.argv[2] + "/mail-mcp", "Authentication resource mismatch"
+assert isinstance(provider["clientId"], str) and provider["clientId"], "Missing registered client"
+assert isinstance(provider["allowedSubjects"], list) and 0 < len(provider["allowedSubjects"]) <= 10, "Missing authorized account"
+assert all(isinstance(s, str) and s and not s.startswith("REPLACE_") for s in provider["allowedSubjects"]), "Account setup is incomplete"
+try:
+    metadata = json.load(urllib.request.urlopen(provider["issuer"].rstrip("/") + "/.well-known/openid-configuration", timeout=10))
+    assert metadata["issuer"] == provider["issuer"] and metadata["jwks_uri"] == provider["jwksUrl"]
+except Exception:
+    raise SystemExit("Authentication discovery preflight failed; private details suppressed")
+print("External authentication discovery preflight passed")
+PY
 APP=/opt/gpt-mail
 CONFIG=/etc/gpt-mail
 STATE=/var/lib/gpt-mail
@@ -27,7 +50,7 @@ python3 - "$BUNDLE" <<'PY'
 import hashlib, json, pathlib, sys
 p = pathlib.Path(sys.argv[1])
 m = json.loads((p / "manifest.json").read_text())
-expected = {"server.cjs", "server.cjs.LEGAL.txt", "config.example.json", "deploy.sh", "gpt-mail.service", "nginx-gpt-mail.conf", "nginx-gpt-mail-proxy.conf", "install-nginx-include.py"}
+expected = {"server.cjs", "server.cjs.LEGAL.txt", "config.example.json", "deploy.sh", "gpt-mail.service", "nginx-gpt-mail.conf", "nginx-gpt-mail-proxy.conf", "install-nginx-include.py", "migrate-storage.mjs"}
 assert set(m["files"]) == expected, "Invalid bundle file list"
 for name, digest in m["files"].items():
     assert hashlib.sha256((p / name).read_bytes()).hexdigest() == digest, "Bundle integrity check failed"
@@ -60,6 +83,7 @@ rollback() {
   done
   if [[ -f "$BACKUP/gpt-mail.service" ]]; then cp -a "$BACKUP/gpt-mail.service" /etc/systemd/system/gpt-mail.service; else rm -f -- /etc/systemd/system/gpt-mail.service; fi
   [[ ! -f "$BACKUP/config.json" ]] || cp -a "$BACKUP/config.json" "$CONFIG/config.json"
+  if [[ -f "$BACKUP/settings.enc.json" ]]; then cp -a "$BACKUP/settings.enc.json" "$STATE/panel/settings.enc.json"; fi
   if [[ -n "$PREVIOUS" ]]; then ln -sfn "$PREVIOUS" "$APP/current"; else [[ ! -L "$APP/current" ]] || rm -f -- "$APP/current"; fi
   systemctl daemon-reload
   [[ "$WAS_ACTIVE" != true ]] || systemctl start gpt-mail.service
@@ -67,6 +91,11 @@ rollback() {
   exit "$result"
 }
 trap rollback ERR
+# Freeze encrypted state before backing it up and rotating its encryption key.
+systemctl stop gpt-mail.service 2>/dev/null || { [[ "$WAS_ACTIVE" == false ]] || false; }
+[[ ! -f "$STATE/panel/settings.enc.json" ]] || cp -a "$STATE/panel/settings.enc.json" "$BACKUP/settings.enc.json"
+/usr/local/bin/node "$BUNDLE/migrate-storage.mjs" "$CONFIG/config.json" "$STATE/panel/settings.enc.json"
+[[ ! -f "$STATE/panel/settings.enc.json" ]] || chown gpt-mail:gpt-mail "$STATE/panel/settings.enc.json"
 
 id -u gpt-mail >/dev/null 2>&1 || useradd --system --home-dir "$STATE" --shell /usr/sbin/nologin gpt-mail
 install -d -m 0755 "$APP" "$APP/releases"
@@ -76,13 +105,13 @@ RELEASE="$APP/releases/$STAMP"
 install -d -m 0755 "$RELEASE"
 install -m 0644 "$BUNDLE/server.cjs" "$BUNDLE/server.cjs.LEGAL.txt" "$BUNDLE/manifest.json" "$RELEASE/"
 install -m 0644 "$BUNDLE/config.example.json" "$CONFIG/config.example.json"
-python3 - "$CONFIG/config.json" "$PUBLIC_ORIGIN" <<'PY'
+python3 - "$CONFIG/config.json" "$PUBLIC_ORIGIN" "$AUTH_PROVIDER_CONFIG" <<'PY'
 import json, pathlib, secrets, sys
 p = pathlib.Path(sys.argv[1])
-config = json.loads(p.read_text()) if p.exists() else {"apiKey": secrets.token_urlsafe(32), "mail": {"accounts": [], "maxMessageBytes": 26214400}}
-assert len(config["apiKey"]) >= 32, "Existing API key is invalid; refusing automatic rotation"
+config = json.loads(p.read_text()) if p.exists() else {"storageKey": secrets.token_urlsafe(32), "mail": {"accounts": [], "maxMessageBytes": 26214400}}
+assert "apiKey" not in config and len(config["storageKey"]) >= 32, "Invalid storage encryption configuration"
 config["http"] = {**config.get("http", {}), "publicUrl": sys.argv[2], "bindHost": "127.0.0.1", "port": 18082, "trustProxy": 1, "allowedOrigins": ["https://chatgpt.com"]}
-config["oauth"] = {**config.get("oauth", {}), "enabled": True, "mcpPath": "/mail-mcp", "routePrefix": "/mail-mcp", "redirectOrigins": ["https://chatgpt.com", "https://chat.openai.com"]}
+config["oauth"] = {"enabled": True, "mcpPath": "/mail-mcp", "routePrefix": "/mail-mcp", "provider": json.loads(pathlib.Path(sys.argv[3]).read_text())}
 p.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
 PY
 if [[ ! -f "$CONFIG/mail.env" ]]; then
@@ -109,7 +138,7 @@ systemctl reload nginx
 ready=false
 for attempt in {1..40}; do
   if curl --noproxy '*' --fail --silent --max-time 3 --resolve "$PUBLIC_HOST:443:127.0.0.1" "$PUBLIC_ORIGIN/mail-mcp/healthz" >/dev/null &&
-     curl --noproxy '*' --fail --silent --max-time 3 --resolve "$PUBLIC_HOST:443:127.0.0.1" "$PUBLIC_ORIGIN/.well-known/oauth-authorization-server/mail-mcp" >/dev/null; then ready=true; break; fi
+     curl --noproxy '*' --fail --silent --max-time 3 --resolve "$PUBLIC_HOST:443:127.0.0.1" "$PUBLIC_ORIGIN/.well-known/oauth-protected-resource/mail-mcp" >/dev/null; then ready=true; break; fi
   sleep 0.25
 done
 [[ "$ready" == true ]]

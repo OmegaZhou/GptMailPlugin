@@ -2,41 +2,44 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../server/server.js';
-import { exportPanelApi } from './export-panel-api.js';
+import { SettingsController } from '../server/settings-ui.js';
+import { SettingsStore } from '../server/settings-store.js';
 
-const server = createServer(); const client = new Client({ name: 'api-export', version: '0.3.0' });
+const server = createServer(); const client = new Client({ name: 'api-export', version: '0.5.0' });
 const [left, right] = InMemoryTransport.createLinkedPair();
 await server.connect(right); await client.connect(left);
 try {
   const { tools } = await client.listTools();
   await mkdir('server/api', { recursive: true });
-  await writeFile('server/api/tools.json', JSON.stringify({ version: '0.3.0', tools }, null, 2) + '\n');
+  await writeFile('server/api/tools.json', JSON.stringify({ version: '0.5.0', tools }, null, 2) + '\n');
   const response = { description: 'MCP CallToolResult: success structuredContent, or isError:true with safe error text. A write may be partially complete; inspect returned per-item results.', content: {
     'application/json': { schema: { type: 'object', properties: { isError: { type: 'boolean' }, content: { type: 'array', items: { type: 'object' } }, structuredContent: { type: 'object', additionalProperties: true } } } },
   } };
   const paths: Record<string, any> = {
-    '/tools': { get: { operationId: 'list_tools', summary: 'List tools after API-key authentication', responses: { 200: { description: 'Tools with input JSON schemas and annotations' }, 401: { description: 'Missing/invalid API key' } } } },
+    '/tools': { get: { operationId: 'list_tools', summary: 'List tools after OAuth access-token authentication', responses: { 200: { description: 'Tools with input JSON schemas and annotations' }, 401: { description: 'Missing/invalid access token' } } } },
   };
   for (const tool of tools) paths['/tools/' + tool.name] = { post: {
     operationId: tool.name, summary: tool.description,
     requestBody: { required: true, content: { 'application/json': { schema: tool.inputSchema } } },
-    responses: { 200: response, 400: { description: 'Invalid arguments or unavailable tool' }, 401: { description: 'Missing/invalid API key' } },
+    responses: { 200: response, 400: { description: 'Invalid arguments or unavailable tool' }, 401: { description: 'Missing/invalid access token' } },
   } };
   await writeFile('server/api/openapi.json', JSON.stringify({
-    openapi: '3.1.0', info: { title: 'GptMail Hosted API', version: '0.3.0', description: 'Configurable single-owner IMAP/SMTP mail service. Base URL is supplied by the caller; no hardcoded production endpoint.' },
+    openapi: '3.1.0', info: { title: 'GptMail Hosted API', version: '0.5.0', description: 'Configurable single-owner IMAP/SMTP mail service. Base URL is supplied by the caller; no hardcoded production endpoint.' },
     // Relative server preserves configurability; callers set server/address.json apiBaseUrl.
     servers: [{ url: '/api/v1' }], security: [{ bearerAuth: [] }],
-    components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', description: 'API key from server/config.json; configured separately per plugin/client.' } } }, paths,
+    components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', description: 'Access token from the configured authentication service; mail.read/mail.write scopes are enforced per operation.' } } }, paths,
   }, null, 2) + '\n');
 } finally { await client.close(); await server.close(); }
 
 // Schemas for the OAuth endpoint, without any configured issuer or credentials.
-const oauthServer = createServer(undefined, { scopes: [], metadataUrl: '' });
-const oauthClient = new Client({ name: 'oauth-api-export', version: '0.3.0' });
+// Listing schemas performs no file reads/writes, mail connections or credential operations.
+const settingsUi = new SettingsController(new SettingsStore('', 'schema-export-placeholder', async () => ({ accounts: [], maxMessageBytes: 26214400 })),
+  'https://mail.example.com', '/mail-mcp', 'oauth');
+const oauthServer = createServer(undefined, { scopes: [], metadataUrl: '', profile: async () => ({ id: 'schema-export' }) }, { controller: settingsUi, identity: { binding: 'schema-export', canWrite: false } });
+const oauthClient = new Client({ name: 'oauth-api-export', version: '0.5.0' });
 const [oauthLeft, oauthRight] = InMemoryTransport.createLinkedPair();
 await oauthServer.connect(oauthRight); await oauthClient.connect(oauthLeft);
 try {
   const { tools } = await oauthClient.listTools();
-  await writeFile('server/api/chatgpt-tools.json', JSON.stringify({ version: '0.3.0', tools: tools.map(tool => ({ ...tool, securitySchemes: tool._meta?.securitySchemes })) }, null, 2) + '\n');
+  await writeFile('server/api/chatgpt-tools.json', JSON.stringify({ version: '0.5.0', tools: tools.map(tool => ({ ...tool, securitySchemes: tool._meta?.securitySchemes })) }, null, 2) + '\n');
 } finally { await oauthClient.close(); await oauthServer.close(); }
-await exportPanelApi();

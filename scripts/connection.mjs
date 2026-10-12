@@ -1,13 +1,23 @@
 export function connectionConfig(plugin, address = {}) {
-  const authType = plugin.authType || 'apiKey';
-  if (!['apiKey', 'oauth'].includes(authType)) throw new Error('authType must be apiKey or oauth');
-  const apiUrl = plugin.apiUrl || (authType === 'oauth' ? address.chatgptMcpUrl : address.mcpUrl);
+  if (plugin.authType && plugin.authType !== 'oauth') throw new Error('Only server-account OAuth is supported');
+  if (plugin.apiKey || plugin.clientSecret) throw new Error('Do not put login credentials in plugin configuration');
+  const apiUrl = plugin.apiUrl || address.chatgptMcpUrl;
   let url;
-  try { url = new URL(apiUrl); } catch { throw new Error('Configure apiUrl in config/plugin.json or ' + (authType === 'oauth' ? 'chatgptMcpUrl' : 'mcpUrl') + ' in server/address.json'); }
+  try { url = new URL(apiUrl); } catch { throw new Error('Configure apiUrl in config/plugin.json or chatgptMcpUrl in server/address.json'); }
   if (url.username || url.password || url.hash || url.search || (url.protocol !== 'https:' &&
     !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) throw new Error('API URL must use HTTPS; HTTP is permitted only for loopback tests.');
-  if (authType === 'apiKey' && (typeof plugin.apiKey !== 'string' || plugin.apiKey.length < 32 || plugin.apiKey.length > 512 || /[\r\n\0]/.test(plugin.apiKey))) throw new Error('Configure apiKey (32–512 characters) in config/plugin.json');
+  if (typeof plugin.clientId !== 'string' || !plugin.clientId.trim() || /[\r\n\0]/.test(plugin.clientId))
+    throw new Error('Configure the clientId registered with the authentication server');
+  let issuer;
+  try { issuer = new URL(plugin.issuer); } catch { throw new Error('Configure the authentication server issuer'); }
+  if (issuer.protocol !== 'https:' || issuer.username || issuer.password || issuer.search || issuer.hash)
+    throw new Error('Issuer must be an HTTPS URL without credentials, query or fragment');
   return { $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
     mcpServers: { 'gpt-mail': { type: 'streamable-http', url: url.href,
-      ...(authType === 'apiKey' ? { headers: { Authorization: 'Bearer ' + plugin.apiKey } } : {}) } } };
+      extensions: { 'com.openai': { auth: {
+        type: 'oauth', client: { mode: 'provided', clientId: plugin.clientId, tokenEndpointAuthMethod: 'none' },
+        authorizationServerBase: issuer.href.replace(/\/$/, ''), resource: url.href,
+        oidcEnabled: true, oidcConfigurationUrl: issuer.href.replace(/\/$/, '') + '/.well-known/openid-configuration',
+        baseScopes: ['openid', 'offline_access', 'mail.read', 'mail.write'],
+      } } } } } };
 }

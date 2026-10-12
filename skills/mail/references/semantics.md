@@ -18,4 +18,4 @@
 
 服务器返回 total_matching 是当前单文件夹搜索的数量，不能当作全邮箱计数。所有读取工具只读打开文件夹并使用 PEEK。
 
-API Key 入口使用 `Authorization: Bearer <apiKey>`；ChatGPT OAuth 入口使用独立 access token，支持读取/写入权限授权。不直连本机邮箱。服务端更换密钥后，API Key 客户端需更新配置并重载，OAuth 客户端需重新授权。
+所有 MCP 与 REST 入口使用认证服务签发的 `Authorization: Bearer <access_token>`，校验读取/写入权限。不直连本机邮箱。storageKey 只用于邮箱凭据的磁盘加密，不是客户端凭据。

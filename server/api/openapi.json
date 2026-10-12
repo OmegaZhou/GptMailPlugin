@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "GptMail Hosted API",
-    "version": "0.3.0",
+    "version": "0.5.0",
     "description": "Configurable single-owner IMAP/SMTP mail service. Base URL is supplied by the caller; no hardcoded production endpoint."
   },
   "servers": [
@@ -20,7 +20,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API key from server/config.json; configured separately per plugin/client."
+        "description": "Access token from the configured authentication service; mail.read/mail.write scopes are enforced per operation."
       }
     }
   },
@@ -28,13 +28,13 @@
     "/tools": {
       "get": {
         "operationId": "list_tools",
-        "summary": "List tools after API-key authentication",
+        "summary": "List tools after OAuth access-token authentication",
         "responses": {
           "200": {
             "description": "Tools with input JSON schemas and annotations"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -86,7 +86,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -144,7 +144,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -202,7 +202,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -268,7 +268,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -346,7 +346,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -424,7 +424,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -499,7 +499,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -570,7 +570,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -648,7 +648,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -731,7 +731,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -802,7 +802,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -866,7 +866,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -987,7 +987,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1116,7 +1116,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1246,7 +1246,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1319,7 +1319,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1460,7 +1460,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1557,7 +1557,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1634,7 +1634,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1705,7 +1705,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }
@@ -1776,7 +1776,7 @@
             "description": "Invalid arguments or unavailable tool"
           },
           "401": {
-            "description": "Missing/invalid API key"
+            "description": "Missing/invalid access token"
           }
         }
       }

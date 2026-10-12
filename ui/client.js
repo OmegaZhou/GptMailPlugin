@@ -1,36 +1,53 @@
 'use strict';
+import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps';
+const app = new App({ name: 'GptMail settings', version: '0.5.0' }, { availableDisplayModes: ['inline', 'fullscreen'] });
 const $ = id => document.getElementById(id);
-let csrf = '', loginKey = '', state = null, pending = false;
+let session = '', pending = false;
 const notice = (message, error = false) => { $('notice').textContent = message; $('notice').classList.toggle('error', error); $('notice').hidden = false; };
 function lock(value) { pending = value; document.querySelectorAll('button').forEach(button => { button.disabled = value; }); }
 function signedOut() {
-  csrf = ''; loginKey = ''; state = null;
-  $('login-card').hidden = false; $('workspace').hidden = true; $('logout').hidden = true; $('session-status').textContent = '未登录';
-  $('login-key').value = ''; $('account-form').reset(); $('connection-form').reset(); $('accounts').replaceChildren(); $('editor').hidden = true;
+  session = '';
+  $('connection-card').hidden = false; $('workspace').hidden = true; $('session-status').textContent = '连接未恢复';
+  $('account-form').reset(); $('accounts').replaceChildren(); $('editor').hidden = true;
+  $('active-account').textContent = ''; $('active-url').value = ''; $('active-auth').textContent = ''; $('auth-status').textContent = ''; $('service-test-status').textContent = '';
 }
-async function api(path, method = 'GET', body) {
-  const response = await fetch('./api/' + path, { method, credentials: 'same-origin', redirect: 'error', headers: {
-    ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(csrf ? { 'X-Panel-CSRF': csrf } : {})
-  }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-  const result = await response.json();
-  if (!response.ok) { if (response.status === 401 && path !== 'session') signedOut(); const error = new Error(result.error || '操作失败，请稍后再试。'); error.status = response.status; throw error; }
+async function call(action, args) {
+  const response = await app.callServerTool({ name: 'settings_' + action, arguments: args });
+  const result = response._meta?.settings;
+  if (response.isError || !result) {
+    const error = new Error(result?.error || '请求失败，请检查服务连接。'); error.status = result?.status; throw error;
+  }
   return result;
+}
+async function restore() {
+  const result = await call('bootstrap', {});
+  if (!result.authenticated) throw new Error('当前服务连接没有邮箱管理权限，请在插件连接设置中完成账号授权。');
+  session = result.session; render(result.state);
+}
+async function api(path, method = 'GET', body, retry = true) {
+  let action = path, args = { session, ...(body || {}) };
+  if (path === 'accounts') { action = 'save_account'; args = { session, account: body }; }
+  else if (path.startsWith('accounts/')) { action = 'delete_account'; args = { session, id: decodeURIComponent(path.slice(9)) }; }
+  try { return await call(action, args); }
+  catch (error) {
+    // Only a server-confirmed expired management session is retried. Transport failures
+    // can have an unknown mutation outcome and must never be automatically replayed.
+    if (error.status === 401 && retry) { await restore(); return api(path, method, body, false); }
+    throw error;
+  }
 }
 async function run(operation) {
   if (pending) return;
   lock(true);
   try { await operation(); } catch (error) { notice(error.message || '操作失败。', true); } finally { lock(false); }
 }
-function authHelp() {
-  $('auth-help').textContent = $('auth-type').value === 'oauth'
-    ? 'ChatGPT 使用 OAuth，连接时在服务授权页验证。导出配置不包含服务端密钥。'
-    : 'API Key 客户端携带 Bearer 密钥。导出文件包含本次登录使用的密钥，请仅私有保存。';
-}
 function text(tag, value, className) { const node = document.createElement(tag); node.textContent = value; if (className) node.className = className; return node; }
 function render(value) {
-  state = value; if (value.csrf) csrf = value.csrf;
-  $('login-card').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; $('session-status').textContent = '已验证 · 私有管理';
-  $('mcp-url').value = value.connection.mcpUrl; $('auth-type').value = value.connection.authType; authHelp();
+  $('connection-card').hidden = true; $('workspace').hidden = false; $('session-status').textContent = '已授权';
+  $('active-url').value = value.activeConnection?.mcpUrl || '';
+  $('active-auth').textContent = 'OAuth';
+  $('auth-status').textContent = '当前连接已验证';
+  $('active-account').textContent = value.activeConnection?.accountName || '服务器所有者';
   $('account-count').textContent = value.accounts.length;
   const list = $('accounts'); list.replaceChildren();
   if (!value.accounts.length) {
@@ -43,13 +60,14 @@ function render(value) {
     info.append(title, text('div', account.email, 'account-email'));
     if (!account.editable) info.append(text('small', '由服务端配置文件管理'));
     const actions = text('div', '', 'account-actions');
-    const button = (label, fn, className = 'secondary') => { const node = text('button', label, className); node.type = 'button'; node.addEventListener('click', () => run(fn)); actions.append(node); };
+    const button = (label, fn, className = 'secondary') => { const node = text('button', label, className); node.type = 'button'; node.addEventListener('click', () => run(() => fn(node))); actions.append(node); };
     button('测试', async () => { const result = await api('test', 'POST', { id: account.id }); notice(testMessage(result), !result.imap || !result.smtp); });
     if (account.id !== value.defaultAccount) button('设为默认', async () => { render(await api('default', 'PUT', { id: account.id })); notice('默认邮箱已更新。'); });
     if (account.editable) {
       button('编辑', async () => openEditor(account));
-      button('移除', async () => {
-        if (!window.confirm('移除这个邮箱的连接？邮箱中的邮件不会删除。')) return;
+      let removing = false;
+      button('移除', async node => {
+        if (!removing) { removing = true; node.textContent = '确认移除'; notice('再次点击确认移除此邮箱连接，邮箱中的邮件会保留。'); return; }
         render(await api('accounts/' + encodeURIComponent(account.id), 'DELETE')); notice('邮箱连接已移除。');
       }, 'danger');
     }
@@ -87,38 +105,11 @@ function accountInput() {
   return { id: $('account-id').value.trim(), email: $('email').value.trim(), name: $('account-name').value.trim(),
     imap: endpoint('imap'), smtp: endpoint('smtp'), folders, saveSent: $('save-sent').checked };
 }
-function connectionInput() {
-  const mcpUrl = new URL($('mcp-url').value.trim());
-  if (mcpUrl.username || mcpUrl.password || mcpUrl.search || mcpUrl.hash ||
-    (mcpUrl.protocol !== 'https:' && !(mcpUrl.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(mcpUrl.hostname)))) throw new Error('接口地址必须使用 HTTPS，不能包含密钥、查询参数或片段。');
-  return { mcpUrl: mcpUrl.href, authType: $('auth-type').value };
-}
-$('login-form').addEventListener('submit', event => { event.preventDefault(); run(async () => {
-  const candidate = $('login-key').value;
-  const result = await api('session', 'POST', { apiKey: candidate }); csrf = result.csrf;
-  loginKey = candidate; $('login-key').value = ''; render(await api('state')); notice('验证成功，可以配置连接和邮箱。');
-}); });
-$('logout').addEventListener('click', () => run(async () => { await api('session', 'DELETE'); signedOut(); notice('已退出登录。'); }));
-$('auth-type').addEventListener('change', () => {
-  authHelp();
-  if (state && Object.values(state.endpoints).includes($('mcp-url').value)) {
-    const target = state.endpoints[$('auth-type').value];
-    if (target) $('mcp-url').value = target;
-    else notice('此服务尚未启用 OAuth，请先配置服务端 OAuth 或填写另一个服务的地址。', true);
-  }
-});
-$('use-current').addEventListener('click', () => { const target = state.endpoints[$('auth-type').value];
-  if (!target) { notice('此服务尚未启用 OAuth。', true); return; } $('mcp-url').value = target; });
-$('connection-form').addEventListener('submit', event => { event.preventDefault(); run(async () => { render(await api('connection', 'PUT', connectionInput())); notice('客户端连接设置已保存。'); }); });
-$('copy-url').addEventListener('click', () => run(async () => { await navigator.clipboard.writeText(connectionInput().mcpUrl); notice('MCP 接口地址已复制。'); }));
-$('export-config').addEventListener('click', () => run(async () => {
-  const connection = connectionInput();
-  if (connection.authType === 'apiKey' && !loginKey) throw new Error('为导出含密钥的配置，请退出后重新输入密钥登录。');
-  const config = { $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', mcpServers: { 'gpt-mail': {
-    type: 'streamable-http', url: connection.mcpUrl, ...(connection.authType === 'apiKey' ? { headers: { Authorization: 'Bearer ' + loginKey } } : {}) } } };
-  const blob = new Blob([JSON.stringify(config, null, 2) + '\n'], { type: 'application/json' }), url = URL.createObjectURL(blob);
-  const link = document.createElement('a'); link.href = url; link.download = 'mcp.json'; document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000); notice(connection.authType === 'apiKey' ? '配置已下载，文件含密钥，请私有保存。' : 'OAuth 配置已下载，不含服务端密钥。');
+$('restore-connection').addEventListener('click', () => run(restore));
+$('test-service').addEventListener('click', () => run(async () => {
+  $('service-test-status').textContent = '正在测试当前服务连接…';
+  try { render(await api('state')); $('service-test-status').textContent = '连接正常 · ' + new Date().toLocaleTimeString(); }
+  catch (error) { $('service-test-status').textContent = '连接失败，请检查服务状态或插件账号授权。'; throw error; }
 }));
 $('add-account').addEventListener('click', () => openEditor());
 $('close-editor').addEventListener('click', closeEditor); $('cancel-editor').addEventListener('click', closeEditor);
@@ -134,4 +125,19 @@ $('test-input').addEventListener('click', () => { if (!$('account-form').reportV
 $('account-form').addEventListener('submit', event => { event.preventDefault(); run(async () => {
   render(await api('accounts', 'POST', accountInput())); closeEditor(); notice('邮箱已保存，立即生效。');
 }); });
-run(async () => { try { render(await api('state')); } catch (error) { if (error.status === 401) signedOut(); else throw error; } });
+function theme(context) {
+  if (context?.theme) applyDocumentTheme(context.theme);
+  if (context?.styles?.variables) applyHostStyleVariables(context.styles.variables);
+}
+app.onhostcontextchanged = theme;
+app.onteardown = async () => {
+  const closing = session; signedOut();
+  if (closing) await call('logout', { session: closing }).catch(() => {});
+  return {};
+};
+lock(true);
+app.connect().then(async () => {
+  theme(app.getHostContext()); signedOut(); await restore(); lock(false);
+}).catch(() => {
+  signedOut(); lock(false); notice('无法恢复已保存的连接。可重试；若授权已撤销，请在插件连接设置中重新登录。', true);
+});

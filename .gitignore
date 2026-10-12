@@ -27,6 +27,10 @@ node_modules/
 !/config/plugin.oauth.example.json
 /mcp.json
 /mcp.local.json
+/.app.json
+/config/app-binding.json
+/config/app-binding.*.json
+!/config/app-binding.example.json
 accounts.json
 
 # OAuth grants, SMTP journal, mail data and credentials
@@ -65,3 +69,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Generated MCP App resource (rebuilt and packaged from ui source)
+ui/settings.html

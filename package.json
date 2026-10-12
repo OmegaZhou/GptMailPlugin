@@ -1,6 +1,6 @@
 {
   "name": "gpt-mail-plugin",
-  "version": "0.3.0",
+  "version": "0.5.5",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,10 +19,13 @@
     "release:server": "npm run build && node scripts/release.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "^1.32.1",
+    "@openai/mcp-extensions": "0.1.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.1",
     "imapflow": "^2.2.7",
+    "jose": "6.2.12",
     "mailparser": "^3.9.0",
     "nodemailer": "^10.0.15",
     "zod": "^4.3.6"

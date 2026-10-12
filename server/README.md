@@ -1,30 +1,30 @@
 # 托管邮箱服务 API
 
-服务端与插件端分别配置同一个 API 密钥。服务端配置使用 `config.example.json` 作为模板，保存为私有 `config.json`。插件使用 `../config/plugin.json`，服务器地址也可记录在 `address.json`。
+服务端使用私有 `config.json` 配置。ChatGPT、MCP 与 REST 客户端统一通过服务器 Authelia 账号认证。生产地址仅保存在私有配置中。
 
 ## 认证
 
 `/mcp` 和 REST 请求需要：
 
 ```http
-Authorization: Bearer <server/config.json 中的 apiKey>
+Authorization: Bearer <Authelia access token>
 ```
 
-密钥在服务启动时读取；修改后重启服务并同步更新 API Key 客户端。认证使用固定长度摘要的恒定时间比较。认证失败返回 HTTP 401。
+所有入口验证令牌签名、有效期、所有者、客户端及资源 audience。缺失或无效令牌返回 HTTP 401；邮件操作进一步检查 mail.read/mail.write 权限。`storageKey` 仅加密本地邮箱凭据，不能认证请求。
 
-可选的 `/chatgpt/mcp` 使用独立 OAuth access token，支持授权码 + PKCE S256、动态客户端注册、刷新和撤销。服务端密钥仅用于在服务器授权页验证所有者；ChatGPT 不需要携带这个密钥。启用与接入步骤见 [chatgpt.md](chatgpt.md)。健康检查和 OAuth 发现/注册可公开访问；邮件操作始终要求认证。
+`/chatgpt/mcp` 使用 Authelia 签发的 OAuth access token，校验所有者、客户端、资源和权限。授权码、PKCE S256、刷新与撤销由 Authelia 管理。接入见 [chatgpt.md](chatgpt.md)。
 
 生产客户端使用 HTTPS。HTTP 监听用于可信反向代理内部通信。`publicUrl` 是公开 origin，不是 `/mcp` 完整路径；配置后反向代理须保留该 Host。浏览器 Origin 需在 `publicUrl` 或 `allowedOrigins` 中。
 
 ## 协议
 
-下文列出默认路径。部署设置 `oauth.routePrefix:"/mail-mcp"`、`oauth.mcpPath:"/mail-mcp"` 时，OAuth MCP 为 `/mail-mcp`，API Key MCP 为 `/mail-mcp/mcp`，REST 为 `/mail-mcp/api/v1`。对应 Nginx 和发现路径配置见 [部署说明](../deploy/README.md)。
+下文列出默认路径。部署设置 `oauth.routePrefix:"/mail-mcp"`、`oauth.mcpPath:"/mail-mcp"` 时，OAuth MCP 为 `/mail-mcp`，MCP 别名 为 `/mail-mcp/mcp`，REST 为 `/mail-mcp/api/v1`。对应 Nginx 和发现路径配置见 [部署说明](../deploy/README.md)。
 
 ### MCP
 
 `POST /mcp` 支持 MCP Streamable HTTP，JSON-RPC 接口包括 initialize、notifications/initialized、tools/list 和 tools/call。服务使用无会话状态模式，响应为 JSON，不要求持久 SSE。MCP 客户端负责标准初始化与协议版本。
 
-`POST /chatgpt/mcp` 使用相同邮件工具和协议，以 OAuth 认证替代 API Key。`oauth.enabled:false` 时入口返回 404。工具列表附带 `securitySchemes` / `_meta.securitySchemes`；授权缺少所需 scope 时返回 `isError:true` 和 `_meta["mcp/www_authenticate"]`，不会执行邮件操作。
+`POST /chatgpt/mcp` 使用相同邮件工具和协议，统一使用 OAuth 认证。认证配置必填且必须启用，否则拒绝启动。工具列表附带 `securitySchemes` / `_meta.securitySchemes`；授权缺少所需 scope 时返回 `isError:true` 和 `_meta["mcp/www_authenticate"]`，不会执行邮件操作。
 
 ### REST
 
@@ -77,10 +77,10 @@ SMTP `status:accepted` 表示全部收件人被服务器接收，`partially_acce
 
 ## 开发与托管
 
-邮箱与连接网页面板位于 `/panel/`，有前缀时为 `/mail-mcp/panel/`。管理 API 使用独立所有者会话和 CSRF 校验，不通过邮件工具传递邮箱凭据。面板新增账号加密保存于状态目录，邮件工具立即读取合并后的账号列表。见 [面板说明](panel.md) 和 [管理接口定义](api/panel-openapi.json)。
+邮箱与连接配置位于插件内嵌 MCP App，UI 源码在 `ui/`。服务端不提供网页 panel 或管理 REST API；配置使用仅对 App 可见的 MCP 工具、已验证所有者和短期管理会话。新增账号加密保存于状态目录，邮件工具立即读取合并后的账号列表。见 [插件配置说明](../docs/settings.md)。
 
-`server/` 中保存服务实现；`../src/index.ts` 是 HTTP 服务入口。`npm run build` 生成 `dist/server.cjs`，`npm start` 启动。`MAIL_SERVER_CONFIG` 可改变配置路径，`MAIL_STATE_DIR` 可改变发送和 OAuth 状态目录，`MAIL_BIND_HOST` 和 `PORT` 可覆盖监听地址。
+`server/` 中保存服务实现；`../src/index.ts` 是 HTTP 服务入口。`npm run build` 生成 `dist/server.cjs`，`npm start` 启动。`MAIL_SERVER_CONFIG` 可改变配置路径，`MAIL_STATE_DIR` 可改变发送和邮箱状态目录，`MAIL_BIND_HOST` 和 `PORT` 可覆盖监听地址。
 
-Docker/compose 仅提供自行托管的配置，没有自动部署。部署完成后将实际 MCP 地址填写到 `address.json` 的 `mcpUrl`、REST 根地址填写到 `apiBaseUrl`，再配置插件密钥。更换托管服务时保持本目录定义的 MCP/REST 契约即可。
+Docker/compose 仅提供自行托管的配置，没有自动部署。部署完成后将实际 MCP 地址填写到 `address.json` 的 `mcpUrl`、REST 根地址填写到 `apiBaseUrl`，再建立客户端认证连接。更换托管服务时保持本目录定义的 MCP/REST 契约即可。
 
 ChatGPT OAuth 地址填写到 `address.json` 的 `chatgptMcpUrl`，通常为 `https://你的域名/chatgpt/mcp`。OAuth discovery 与授权端点必须一起对外提供，不能只转发 MCP 路径。

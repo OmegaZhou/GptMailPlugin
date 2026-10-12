@@ -1,21 +1,19 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GptMail · 邮箱与连接</title><link rel="stylesheet" href="./panel.css"><script src="./panel.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GptMail · 邮箱与连接</title><style>/* SETTINGS_CSS */</style></head>
 <body>
-<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">M</span><div><strong>GptMail</strong><span class="subtitle">邮箱与连接</span></div></div><div class="session"><span id="session-status">未登录</span><button id="logout" class="quiet" hidden>退出登录</button></div></header>
+<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">M</span><div><strong>GptMail</strong><span class="subtitle">邮箱与连接</span></div></div><div class="session"><span id="session-status">未登录</span></div></header>
 <main>
 <section class="intro"><span class="eyebrow">YOUR MAIL, CONNECTED</span><h1>让邮箱接入你的工作流</h1><p>配置连接，管理邮箱。在 ChatGPT 和其他 MCP 客户端中使用同一套邮件工具。</p></section>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-<section id="login-card" class="card login-card"><div><span class="step">01 / 连接服务</span><h2>使用服务端密钥登录</h2><p>在自己的服务地址下打开此面板，输入该服务的 API 密钥。</p></div><form id="login-form"><label for="login-key">服务端密钥</label><div class="input-action"><input id="login-key" type="password" required minlength="32" maxlength="512" autocomplete="off" placeholder="输入已配置的服务端密钥"><button type="submit" class="primary">验证并进入</button></div><small>密钥仅发送给当前服务，不保存在浏览器存储中。</small></form></section>
+<section id="connection-card" class="card"><h2>恢复服务连接</h2><p>使用首次连接时保存的账号授权进入邮箱管理，无需再次填写服务器地址和密钥。</p><button id="restore-connection" type="button" class="primary">重试连接</button></section>
 <div id="workspace" hidden>
+<section class="card"><div class="card-head"><h2>当前服务连接</h2><button id="test-service" type="button" class="secondary">测试服务连接</button></div><label for="active-url">实际连接地址</label><input id="active-url" type="url" readonly><p>服务器账号：<span id="active-account"></span></p><p>认证方式：<span id="active-auth"></span></p><p>授权状态：<span id="auth-status"></span></p><p id="service-test-status" class="help" role="status">已连接当前服务</p></section>
 <div class="layout">
 <div class="main-column">
-<section class="card"><div class="card-head"><div><span class="step">01 / 客户端连接</span><h2>MCP 连接配置</h2></div><span class="badge">远程服务</span></div>
-<form id="connection-form"><label for="mcp-url">MCP 接口完整地址</label><input id="mcp-url" type="url" required placeholder="HTTPS MCP URL"><div class="field-row"><div><label for="auth-type">认证方式</label><select id="auth-type"><option value="oauth">OAuth · ChatGPT</option><option value="apiKey">API Key · MCP 客户端</option></select></div><div class="align-bottom"><button id="use-current" type="button" class="secondary">使用当前服务地址</button></div></div><p id="auth-help" class="help"></p><div class="actions"><button type="submit" class="primary">保存连接设置</button><button id="copy-url" type="button" class="secondary">复制接口地址</button><button id="export-config" type="button" class="secondary">下载 MCP 配置</button></div></form>
-<p class="help">这里保存客户端连接设置，不改变当前服务的监听地址。ChatGPT 中的连接地址仍需在插件设置页填写。</p></section>
-<section class="card"><div class="card-head"><div><span class="step">02 / 邮箱账号</span><h2>已连接的邮箱 <span id="account-count" class="count">0</span></h2></div><button id="add-account" class="primary" type="button">＋ 添加邮箱</button></div><div id="accounts"></div><p class="help">面板添加的邮箱保存后立即生效。当前服务的授权可访问这里配置的全部邮箱。</p></section>
+<section class="card"><div class="card-head"><div><span class="step">02 / 邮箱账号</span><h2>已连接的邮箱 <span id="account-count" class="count">0</span></h2></div><button id="add-account" class="primary" type="button">＋ 添加邮箱</button></div><div id="accounts"></div><p class="help">插件添加的邮箱保存后立即生效。当前服务的授权可访问这里配置的全部邮箱。</p></section>
 </div>
-<aside class="card guide"><span class="step">接入提示</span><h2>从配置到使用</h2><ol><li><strong>添加邮箱</strong><p>填写邮箱授权码，分别测试收件与发件连接。</p></li><li><strong>连接 ChatGPT</strong><p>复制 OAuth 接口地址，在插件设置页添加自定义 MCP。</p></li><li><strong>完成授权</strong><p>在服务授权页输入服务端密钥，批准邮件权限。</p></li></ol><div class="divider"></div><h3>凭据保存在服务端</h3><p>邮箱授权码加密保存，不返回给聊天模型。测试连接不会发送邮件。</p><p>QQ、163 等邮箱通常使用邮箱后台生成的授权码；企业邮箱按管理员提供的参数填写。</p></aside>
+<aside class="card guide"><span class="step">接入提示</span><h2>插件内完成配置</h2><ol><li><strong>添加邮箱</strong><p>填写邮箱授权码，分别测试收件与发件连接。</p></li><li><strong>连接 ChatGPT</strong><p>当前插件已经连接服务，配置邮箱后即可使用邮件工具。</p></li><li><strong>完成授权</strong><p>账号授权在首次连接时完成。这里添加邮箱无需再次授权。</p></li></ol><div class="divider"></div><h3>凭据保存在服务端</h3><p>邮箱授权码加密保存，不返回给聊天模型。测试连接不会发送邮件。</p><p>QQ、163 等邮箱通常使用邮箱后台生成的授权码；企业邮箱按管理员提供的参数填写。</p></aside>
 </div>
 <section id="editor" class="card editor" hidden><div class="card-head"><div><span class="step">邮箱配置</span><h2 id="editor-title">添加邮箱</h2></div><button id="close-editor" class="quiet" type="button">关闭</button></div>
 <form id="account-form"><div class="field-row three"><div><label for="account-id">账号 ID</label><input id="account-id" required pattern="[A-Za-z0-9_-]{1,64}" maxlength="64" placeholder="如 personal"></div><div><label for="email">邮箱地址</label><input id="email" type="email" required placeholder="你的邮箱地址"></div><div><label for="account-name">显示名称</label><input id="account-name" maxlength="100" placeholder="如 工作邮箱"></div></div>
@@ -29,4 +27,4 @@
 </section>
 </div>
 <footer>GptMail · 通用 IMAP / SMTP 邮箱服务</footer>
-</main></body></html>
+</main><script>/* SETTINGS_JS */</script></body></html>

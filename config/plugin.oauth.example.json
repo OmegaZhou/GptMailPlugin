@@ -1,4 +1,6 @@
 {
   "authType": "oauth",
-  "apiUrl": ""
+  "apiUrl": "https://mail.example.com/mail-mcp",
+  "issuer": "https://mail.example.com/mailauth",
+  "clientId": "registered-client-id"
 }

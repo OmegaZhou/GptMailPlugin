@@ -1,12 +1,19 @@
 {
-  "apiKey": "",
+  "storageKey": "",
   "oauth": {
-    "enabled": false,
-    "mcpPath": "/chatgpt/mcp",
-    "routePrefix": "",
-    "redirectOrigins": ["https://chatgpt.com", "https://chat.openai.com"]
+    "enabled": true,
+    "mcpPath": "/mail-mcp",
+    "routePrefix": "/mail-mcp",
+    "provider": {
+      "issuer": "https://mail.example.com/mailauth",
+      "jwksUrl": "https://mail.example.com/mailauth/jwks.json",
+      "resource": "https://mail.example.com/mail-mcp",
+      "clientId": "gptmail-chatgpt",
+      "allowedSubjects": ["REPLACE_WITH_AUTHENTICATED_OWNER_SUBJECT"]
+    }
   },
   "http": {
+    "publicUrl": "https://mail.example.com",
     "bindHost": "127.0.0.1",
     "port": 3000,
     "trustProxy": 0,

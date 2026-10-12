@@ -1,0 +1,8 @@
+{
+  "apps": {
+    "gpt-mail": {
+      "id": "REPLACE_WITH_REGISTERED_APP_ID",
+      "required": true
+    }
+  }
+}
