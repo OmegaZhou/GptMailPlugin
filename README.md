@@ -79,7 +79,7 @@ MCP 和 REST 统一使用独立认证服务签发的 access token，校验签名
 `npm run package -- config/app-binding.json`。打包器仅向私有 ZIP 注入应用依赖
 和面板“网站”链接；源码清单不保存实例编号。
 
-认证模块作为 `auth/` 子模块引用 [GptPluginOauth](https://github.com/OmegaZhou/GptPluginOauth)。
+认证模块作为 `auth/` 子模块引用 [AuthService](https://github.com/OmegaZhou/AuthService)。
 运行 `git submodule update --init --recursive` 获取依赖。邮箱仓库只验证令牌，
 认证仓库维护 Authelia 依赖、SMTP 登录、账号和部署工具，其他插件也可共用。
 
