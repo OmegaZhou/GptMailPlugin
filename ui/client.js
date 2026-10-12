@@ -135,7 +135,7 @@ function providerChanged() {
   $('google-login').disabled = !googleAvailable;
   if (google || provider === 'custom') return;
   const presets = {
-    qq: ['imap.qq.com', 'smtp.qq.com', 465, true],
+    qq: ['imap.qq.com', 'smtp.qq.com', 587, false],
     '163': ['imap.163.com', 'smtp.163.com', 465, true],
     '126': ['imap.126.com', 'smtp.126.com', 465, true],
     icloud: ['imap.mail.me.com', 'smtp.mail.me.com', 587, false],

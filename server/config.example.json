@@ -29,7 +29,7 @@
       {
         "id": "qq", "email": "your-number@qq.com",
         "imap": { "host": "imap.qq.com", "port": 993, "secure": true, "passwordEnv": "QQ_MAIL_PASSWORD" },
-        "smtp": { "host": "smtp.qq.com", "port": 465, "secure": true, "passwordEnv": "QQ_MAIL_PASSWORD" },
+        "smtp": { "host": "smtp.qq.com", "port": 587, "secure": false, "passwordEnv": "QQ_MAIL_PASSWORD" },
         "saveSent": true
       }
     ],
