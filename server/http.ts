@@ -20,6 +20,8 @@ import type { JWTVerifyGetKey } from 'jose';
 import { mailOAuthRouter } from './oauth-router.js';
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
+import { GoogleMailboxClient, MailboxOAuth, googleMailboxConfigSchema, mailboxOAuthRouter } from './mailbox-oauth.js';
+import { serviceInfoRouter } from './service-info.js';
 
 export const httpConfigSchema = z.object({
   storageKey: z.string().min(32).max(512),
@@ -30,6 +32,7 @@ export const httpConfigSchema = z.object({
   }).default({ bindHost: '127.0.0.1', port: 3000, trustProxy: 0, allowedOrigins: [] }),
   mail: configSchema,
   oauth: oauthConfigSchema,
+  googleMailbox: googleMailboxConfigSchema.optional(),
 }).strict();
 export type HttpOptions = z.infer<typeof httpConfigSchema>;
 
@@ -47,7 +50,13 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   const settingsStore = await new SettingsStore(settingsOptions?.directory || join(oauthStateDirectory ||
     process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state'), 'panel'), settings.storageKey,
     settingsOptions?.baseConfig || (async () => settings.mail)).init();
-  service ||= new MailService(() => settingsStore.mail(), undefined, undefined, undefined, (account, kind) => settingsStore.credentials(account, kind));
+  const googleSecret = settings.googleMailbox && process.env[settings.googleMailbox.clientSecretEnv];
+  const callbackPath = `${prefix}/mailbox-oauth/google/callback`;
+  const google = settings.googleMailbox && googleSecret && base
+    ? new GoogleMailboxClient(settings.googleMailbox, new URL(callbackPath, base).href, googleSecret) : undefined;
+  settingsStore.useGoogle(google);
+  const mailboxOAuth = new MailboxOAuth(settingsStore, google);
+  service ||= new MailService(() => settingsStore.mail(), undefined, undefined, undefined, (account, kind) => settingsStore.resolveCredentials(account, kind));
   if (http.trustProxy) app.set('trust proxy', http.trustProxy);
   app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -67,7 +76,8 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   });
   app.get(['/healthz', ...(prefix ? [prefix + '/healthz'] : [])], (_req, res) => res.json({ status: 'ok' }));
   app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: true, legacyHeaders: false }));
-  // No website or management REST endpoints. Configuration is an MCP App inside the plugin.
+  app.use(serviceInfoRouter(prefix));
+  // Management remains an MCP App inside the plugin; public disclosures have no form.
   app.use((req, res, next) => {
     if (/^(?:\/mail-mcp)?\/panel(?:\/|$)/.test(req.path) || req.path === `${prefix}/panel` || req.path.startsWith(`${prefix}/panel/`)) {
       res.status(404).json({ error: 'Not found' }); return;
@@ -76,7 +86,7 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   });
   const settingsUi = new SettingsController(settingsStore, base?.origin || `http://localhost:${http.port}`,
     settings.oauth.mcpPath || '/chatgpt/mcp',
-    'oauth', settingsOptions?.verify);
+    'oauth', settingsOptions?.verify, undefined, mailboxOAuth);
   async function handleMcp(req: express.Request, res: express.Response, oauth: { scopes: string[]; metadataUrl: string }) {
     if (req.method !== 'POST') { res.status(405).setHeader('Allow', 'POST'); res.end(); return; }
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true,
@@ -103,6 +113,7 @@ export async function createHttpApp(options: HttpOptions, service?: MailService,
   const oauth = new ExternalTokenVerifier(provider, authKeyResolver);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(resource);
   app.use(mailOAuthRouter(provider));
+  app.use(mailboxOAuthRouter(mailboxOAuth, callbackPath));
   app.all([`${prefix}/authorize`, `${prefix}/token`, `${prefix}/register`, `${prefix}/revoke`, `${prefix}/oauth/approve`],
     (_req, res) => { res.status(404).json({ error: 'Authentication is provided by the configured account service.' }); });
   // All protected routes share token verification, before parsing email bodies.

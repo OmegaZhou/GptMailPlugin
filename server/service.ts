@@ -12,15 +12,15 @@ import { SendJournal } from './journal.js';
 export class MailService {
   constructor(
     private config: () => Promise<Config> = loadConfig,
-    private imapFactory: (a: Account) => ImapFlow = a => {
+    private imapFactory: (a: Account) => ImapFlow | Promise<ImapFlow> = async a => {
       const ep = a.imap;
       return new ImapFlow({ host: ep.host, port: ep.port, secure: ep.secure,
-        ...(ep.secure ? {} : { doSTARTTLS: true }), auth: this.credentialProvider(a, 'imap'), logger: false,
+        ...(ep.secure ? {} : { doSTARTTLS: true }), auth: await this.credentialProvider(a, 'imap'), logger: false,
         tls: { rejectUnauthorized: true }, disableAutoIdle: true,
         connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000 });
     },
-    private smtpFactory = (a: Account) => {
-      const ep = a.smtp; const auth = this.credentialProvider(a, 'smtp');
+    private smtpFactory: (a: Account) => ReturnType<typeof nodemailer.createTransport> | Promise<ReturnType<typeof nodemailer.createTransport>> = async a => {
+      const ep = a.smtp; const auth = await this.credentialProvider(a, 'smtp');
       return nodemailer.createTransport({ host: ep.host, port: ep.port, secure: ep.secure,
         requireTLS: !ep.secure, tls: { rejectUnauthorized: true },
         auth: 'accessToken' in auth ? { type: 'OAuth2', user: auth.user, accessToken: auth.accessToken } : auth,
@@ -28,7 +28,7 @@ export class MailService {
         disableFileAccess: true, disableUrlAccess: true });
     },
     private journal = new SendJournal(process.env.MAIL_STATE_DIR || join(homedir(), '.config', 'gpt-mail', 'state')),
-    private credentialProvider: typeof credentials = credentials,
+    private credentialProvider: (account: Account, kind: 'imap' | 'smtp') => ReturnType<typeof credentials> | Promise<ReturnType<typeof credentials>> = credentials,
   ) {}
   async accounts() {
     const c = await this.config();
@@ -40,7 +40,7 @@ export class MailService {
     return { account_id: a.id, email: a.email, name: a.name, protocol: 'IMAP/SMTP', labels_mode: 'folders', thread_mode: 'bounded RFC Message-ID/References matching' };
   }
   private async connected<T>(id: string | undefined, fn: (c: ImapFlow, a: Account, config: Config) => Promise<T>): Promise<T> {
-    const config = await this.config(); const a = selectAccount(config, id); const c = this.imapFactory(a);
+    const config = await this.config(); const a = selectAccount(config, id); const c = await this.imapFactory(a);
     c.on('error', () => {}); // Rejecting IMAP commands report errors; never print auth/server responses.
     try { await c.connect(); return await fn(c, a, config); }
     finally { try { await c.logout(); } catch { c.close(); } }
@@ -245,7 +245,7 @@ export class MailService {
     const fingerprint = createHash('sha256').update(JSON.stringify([input, extra.map(e => ({ filename: e.filename, hash: createHash('sha256').update(e.content).digest('hex') }))])).digest('hex');
     return this.journal.run(accountKey(a) + ':' + operation, fingerprint, async () => {
       const built = await compose(a, input, max, replyOverride || await this.reply(c, a, input.reply_message_id, max), false, extra);
-      const smtp = this.smtpFactory(a);
+      const smtp = await this.smtpFactory(a);
       let receipt;
       try { receipt = await smtp.sendMail({ envelope: built.envelope, raw: built.raw }); }
       finally { smtp.close(); }

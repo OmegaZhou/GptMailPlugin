@@ -1,8 +1,5 @@
 {
   "apps": {
-    "gpt-mail": {
-      "id": "REPLACE_WITH_REGISTERED_APP_ID",
-      "required": true
-    }
+    "gpt-mail": { "id": "asdk_app_REPLACE_WITH_VERIFIED_CLOUD_APP_ID", "required": true }
   }
 }

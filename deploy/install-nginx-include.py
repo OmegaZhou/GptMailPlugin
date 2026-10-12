@@ -2,8 +2,24 @@
 """Insert one include in the existing canonical HTTPS vhost, without changing other sites."""
 from pathlib import Path
 import sys
+import re
 
-def install(path: Path, hostname: str) -> None:
+def inherited_includes(previous: Path) -> list[str]:
+    """Keep independently deployed services that an older mail snippet included."""
+    if not previous.exists():
+        return []
+    depth = 0
+    includes = []
+    for line in previous.read_text(encoding="utf-8").splitlines():
+        code = line.split("#", 1)[0]
+        if depth == 0:
+            match = re.fullmatch(r"\s*include\s+(/etc/nginx/snippets/[A-Za-z0-9_.-]+\.conf);\s*", code)
+            if match and match.group(1) != "/etc/nginx/snippets/gpt-mail.conf":
+                includes.append(match.group(1))
+        depth += code.count("{") - code.count("}")
+    return list(dict.fromkeys(includes))
+
+def install(path: Path, hostname: str, additional: list[str] | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     marker = f"server_name {hostname};"
     if text.count(marker) != 1:
@@ -22,13 +38,15 @@ def install(path: Path, hostname: str) -> None:
                 block = text[start:index]
                 if "listen 443" not in block:
                     raise RuntimeError("Canonical server is not HTTPS")
-                include = "include /etc/nginx/snippets/gpt-mail.conf;"
-                if include not in block:
-                    path.write_text(text[:index] + "    " + include + "\n" + text[index:], encoding="utf-8")
+                additions = ["/etc/nginx/snippets/gpt-mail.conf", *(additional or [])]
+                missing = [f"include {name};" for name in additions if f"include {name};" not in block]
+                if missing:
+                    path.write_text(text[:index] + "".join("    " + line + "\n" for line in missing) + text[index:], encoding="utf-8")
                 return
     raise RuntimeError("Unclosed server block")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: install-nginx-include.py SITE_FILE HOSTNAME")
-    install(Path(sys.argv[1]), sys.argv[2])
+    if len(sys.argv) not in (3, 4):
+        raise SystemExit("usage: install-nginx-include.py SITE_FILE HOSTNAME [PREVIOUS_MAIL_SNIPPET]")
+    inherited = inherited_includes(Path(sys.argv[3])) if len(sys.argv) == 4 else []
+    install(Path(sys.argv[1]), sys.argv[2], inherited)

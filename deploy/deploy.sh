@@ -123,7 +123,7 @@ ln -sfn "releases/$STAMP" "$APP/current"
 install -m 0644 "$BUNDLE/gpt-mail.service" /etc/systemd/system/gpt-mail.service
 install -m 0644 "$BUNDLE/nginx-gpt-mail.conf" /etc/nginx/snippets/gpt-mail.conf
 install -m 0644 "$BUNDLE/nginx-gpt-mail-proxy.conf" /etc/nginx/snippets/gpt-mail-proxy.conf
-python3 "$BUNDLE/install-nginx-include.py" "$SITE" "$PUBLIC_HOST"
+python3 "$BUNDLE/install-nginx-include.py" "$SITE" "$PUBLIC_HOST" "$BACKUP/gpt-mail.conf"
 nginx -t
 systemctl daemon-reload
 systemctl enable gpt-mail.service

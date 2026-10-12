@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "gpt-mail",
-  "version": "0.5.5",
+  "version": "0.5.12",
   "description": "通用 IMAP/SMTP 邮箱：多账号、搜索、阅读、附件、草稿、发送、回复、转发和邮件整理。",
   "author": {
     "name": "GptMail Contributors"
@@ -11,7 +11,7 @@
       "interface": {
         "displayName": "GptMail",
         "shortDescription": "多账号邮箱搜索、收发与整理",
-        "longDescription": "登录服务器账号后，在 ChatGPT 内管理多个 IMAP/SMTP 邮箱。连接自动恢复，无需再次填写服务器地址或密钥。",
+        "longDescription": "连接固定托管的 GptMail 云端服务，登录服务器账号后在插件面板管理多个邮箱。Google 使用服务商登录授权并自动刷新令牌；QQ 使用授权码，iCloud 使用应用专用密码。服务授权和邮箱配置持久保存，新增邮箱无需重新登录服务器。需要安装或关联云端邮箱服务。",
         "developerName": "GptMail Contributors",
         "category": "Productivity",
         "capabilities": [
@@ -26,8 +26,7 @@
           "为这封邮件起草回复。",
           "帮我整理收件箱。"
         ]
-      },
-      "mcpServers": "./mcp.json"
+      }
     }
   }
 }

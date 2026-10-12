@@ -6,8 +6,9 @@ import { createSettings, type OpenAIUiToolMetadata, type OpenAIUiResourceMetadat
 import { SettingsStoreError, SettingsStore, settingsAccountSchema } from './settings-store.js';
 import { verifyMailbox, type ConnectionVerifier } from './mailbox-verifier.js';
 import { settingsHtml } from '../ui/resource.js';
+import { MailboxOAuth, MailboxOAuthError } from './mailbox-oauth.js';
 
-export const SETTINGS_URI = 'ui://gpt-mail/settings-v1.html';
+export const SETTINGS_URI = `ui://gpt-mail/settings-${createHash('sha256').update(settingsHtml).digest('hex').slice(0,12)}.html`;
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const tokenSchema = z.string().min(40).max(64);
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -22,7 +23,7 @@ export class SettingsController {
   constructor(readonly store: SettingsStore,
     private origin: string, private mcpPath: string,
     private authType: 'oauth', private verify: ConnectionVerifier = verifyMailbox,
-    private now: () => number = Date.now) {}
+    private now: () => number = Date.now, private mailboxOAuth?: MailboxOAuth) {}
   private limit(bucket: string, maximum: number, period: number) {
     for (const [key, entry] of this.limits) if (entry.expires <= this.now()) this.limits.delete(key);
     const entry = this.limits.get(bucket) || { count: 0, expires: this.now() + period };
@@ -41,7 +42,7 @@ export class SettingsController {
     return { session, state: await this.view(identity) };
   }
   async view(identity?: Identity) {
-    return { ...(await this.store.view()), activeConnection: { ...this.connectionInfo(), authenticated: true,
+    return { ...(await this.store.view()), providers: { google: { available: this.mailboxOAuth?.available() || false } }, activeConnection: { ...this.connectionInfo(), authenticated: true,
       accountName: identity?.accountName || '服务器所有者' } };
   }
   async execute(action: string, args: any, identity: Identity) {
@@ -58,6 +59,11 @@ export class SettingsController {
     switch (action) {
       case 'logout': this.sessions.delete(hash(args.session)); return { ok: true };
       case 'state': return this.view(identity);
+      case 'google_begin': {
+        this.limit('google:' + identity.binding, 6, 60000);
+        if (!this.mailboxOAuth) throw new MailboxOAuthError('管理员尚未配置 Google OAuth 客户端。');
+        return this.mailboxOAuth.begin(args.id, args.name);
+      }
       case 'save_account': await this.store.saveAccount(args.account); break;
       case 'delete_account': await this.store.deleteAccount(args.id); break;
       case 'default': await this.store.setDefault(args.id); break;
@@ -98,6 +104,7 @@ export function registerSettingsUi(server: McpServer, controller: SettingsContro
     ['save_account', { session: tokenSchema, account: settingsAccountSchema }, false],
     ['delete_account', { session: tokenSchema, id: idSchema }, false],
     ['default', { session: tokenSchema, id: idSchema }, false],
+    ['google_begin', { session: tokenSchema, id: idSchema, name: z.string().max(100).optional() }, false],
     ['test', { session: tokenSchema, id: idSchema.optional(), account: settingsAccountSchema.optional() }, true],
   ];
   for (const [action, shape, readOnly] of definitions) server.registerTool('settings_' + action, {
@@ -110,7 +117,7 @@ export function registerSettingsUi(server: McpServer, controller: SettingsContro
       // _meta is delivered to the component, never copied into model-readable content/structuredContent.
       return { content: [], _meta: { settings: result } };
     } catch (error) {
-      const message = error instanceof SettingsError || error instanceof SettingsStoreError ? error.message
+      const message = error instanceof SettingsError || error instanceof SettingsStoreError || error instanceof MailboxOAuthError ? error.message
         : error instanceof ZodError ? '配置格式不正确，请检查必填项。' : '操作失败，请检查服务状态。';
       return { isError: true, content: [{ type: 'text', text: message }],
         _meta: { settings: { error: message, status: error instanceof SettingsError ? error.status : 400 } } };

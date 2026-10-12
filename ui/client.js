@@ -1,10 +1,12 @@
 'use strict';
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps';
-const app = new App({ name: 'GptMail settings', version: '0.5.0' }, { availableDisplayModes: ['inline', 'fullscreen'] });
+const app = new App({ name: 'GptMail settings', version: '0.5.12' }, { availableDisplayModes: ['inline', 'fullscreen'] });
 const $ = id => document.getElementById(id);
-let session = '', pending = false;
+let session = '', pending = false, googleAvailable = false;
 const notice = (message, error = false) => { $('notice').textContent = message; $('notice').classList.toggle('error', error); $('notice').hidden = false; };
-function lock(value) { pending = value; document.querySelectorAll('button').forEach(button => { button.disabled = value; }); }
+function lock(value) { pending = value; document.querySelectorAll('button').forEach(button => { button.disabled = value; });
+  if (!value) $('google-login').disabled = !googleAvailable;
+}
 function signedOut() {
   session = '';
   $('connection-card').hidden = false; $('workspace').hidden = true; $('session-status').textContent = '连接未恢复';
@@ -43,6 +45,7 @@ async function run(operation) {
 }
 function text(tag, value, className) { const node = document.createElement(tag); node.textContent = value; if (className) node.className = className; return node; }
 function render(value) {
+  googleAvailable = Boolean(value.providers?.google?.available);
   $('connection-card').hidden = true; $('workspace').hidden = false; $('session-status').textContent = '已授权';
   $('active-url').value = value.activeConnection?.mcpUrl || '';
   $('active-auth').textContent = 'OAuth';
@@ -64,7 +67,10 @@ function render(value) {
     button('测试', async () => { const result = await api('test', 'POST', { id: account.id }); notice(testMessage(result), !result.imap || !result.smtp); });
     if (account.id !== value.defaultAccount) button('设为默认', async () => { render(await api('default', 'PUT', { id: account.id })); notice('默认邮箱已更新。'); });
     if (account.editable) {
-      button('编辑', async () => openEditor(account));
+      if (account.provider === 'google') {
+        info.append(text('small', 'Google 登录授权 · 自动更新令牌'));
+        button('重新连接 Google', async () => connectGoogle(account.id, account.name));
+      } else button('编辑', async () => openEditor(account));
       let removing = false;
       button('移除', async node => {
         if (!removing) { removing = true; node.textContent = '确认移除'; notice('再次点击确认移除此邮箱连接，邮箱中的邮件会保留。'); return; }
@@ -83,6 +89,7 @@ function openEditor(account) {
   $('editor-title').textContent = account ? '编辑邮箱' : '添加邮箱';
   $('account-id').value = account?.id || ''; $('email').value = account?.email || ''; $('account-name').value = account?.name || '';
   $('save-sent').checked = account?.saveSent ?? true;
+  providerChanged();
   for (const kind of ['imap', 'smtp']) {
     const ep = account?.[kind];
     $(kind + '-host').value = ep?.host || ''; $(kind + '-port').value = ep?.port || (kind === 'imap' ? 993 : 465);
@@ -112,17 +119,53 @@ $('test-service').addEventListener('click', () => run(async () => {
   catch (error) { $('service-test-status').textContent = '连接失败，请检查服务状态或插件账号授权。'; throw error; }
 }));
 $('add-account').addEventListener('click', () => openEditor());
+$('refresh-accounts').addEventListener('click', () => run(async () => { render(await api('state')); notice('邮箱列表已刷新。'); }));
 $('close-editor').addEventListener('click', closeEditor); $('cancel-editor').addEventListener('click', closeEditor);
 $('same-secret').addEventListener('click', () => { $('smtp-secret').value = $('imap-secret').value; $('smtp-type').value = $('imap-type').value; $('smtp-user').value = $('imap-user').value; });
-$('provider').addEventListener('change', () => { const provider = $('provider').value; if (provider === 'custom') return;
-  for (const kind of ['imap', 'smtp']) { $(kind + '-host').value = kind + '.' + provider + '.com'; $(kind + '-port').value = kind === 'imap' ? 993 : 465;
-    $(kind + '-tls').value = 'true'; $(kind + '-type').value = 'password'; } });
+function providerChanged() {
+  const provider = $('provider').value, google = provider === 'google';
+  $('google-connect').hidden = !google; $('protocol-fields').hidden = google;
+  $('manual-actions').hidden = google; $('mailbox-email-field').hidden = google;
+  $('save-sent-field').hidden = google; $('folder-fields').hidden = google;
+  $('secret-help').hidden = google;
+  $('email').required = !google;
+  $('protocol-fields').querySelectorAll('input,select,button').forEach(node => { node.disabled = google; });
+  $('google-status').textContent = googleAvailable ? '在 Google 登录并允许邮箱访问后，返回这里刷新邮箱列表。无需输入 Google 密码或令牌。'
+    : '管理员尚未配置 Google OAuth 客户端。配置后即可直接登录 Google 连接邮箱。';
+  $('google-login').disabled = !googleAvailable;
+  if (google || provider === 'custom') return;
+  const presets = {
+    qq: ['imap.qq.com', 'smtp.qq.com', 465, true],
+    '163': ['imap.163.com', 'smtp.163.com', 465, true],
+    '126': ['imap.126.com', 'smtp.126.com', 465, true],
+    icloud: ['imap.mail.me.com', 'smtp.mail.me.com', 587, false],
+  };
+  const preset = presets[provider];
+  if (!preset) return;
+  $('imap-host').value = preset[0]; $('imap-port').value = 993; $('imap-tls').value = 'true';
+  $('smtp-host').value = preset[1]; $('smtp-port').value = preset[2]; $('smtp-tls').value = String(preset[3]);
+  for (const kind of ['imap', 'smtp']) $(kind + '-type').value = 'password';
+  $('secret-help').textContent = provider === 'icloud' ? '使用 Apple 账号生成的应用专用密码。收件登录名可填写邮箱 @ 前的部分；发件使用完整邮箱地址。'
+    : '在邮箱设置中启用 IMAP/SMTP 并生成授权码。填写授权码，不要填写 QQ 或网易账号的登录密码。';
+}
+async function connectGoogle(id, name) {
+  const result = await api('google_begin', 'POST', { id, ...(name ? { name } : {}) });
+  const opened = await app.openLink({ url: result.url });
+  if (opened.isError) throw new Error('无法打开 Google 授权页，请重试。');
+  notice('已打开 Google 授权页。完成后返回本面板，点击“刷新邮箱列表”。');
+}
+$('provider').addEventListener('change', providerChanged);
+$('google-login').addEventListener('click', () => {
+  if (!$('account-id').reportValidity()) return;
+  run(() => connectGoogle($('account-id').value.trim(), $('account-name').value.trim()));
+});
 $('test-input').addEventListener('click', () => { if (!$('account-form').reportValidity()) return; run(async () => {
   $('test-result').textContent = '正在验证 IMAP 和 SMTP 登录，请稍候…'; $('test-result').hidden = false;
   try { const result = await api('test', 'POST', { account: accountInput() }); $('test-result').textContent = testMessage(result); }
   catch (error) { $('test-result').textContent = error.message; throw error; }
 }); });
 $('account-form').addEventListener('submit', event => { event.preventDefault(); run(async () => {
+  if ($('provider').value === 'google') return;
   render(await api('accounts', 'POST', accountInput())); closeEditor(); notice('邮箱已保存，立即生效。');
 }); });
 function theme(context) {

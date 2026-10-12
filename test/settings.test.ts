@@ -29,7 +29,7 @@ async function fixture() {
   const { app, settingsStore: panelStore } = await createHttpApp({ storageKey: key, mail: base, http: { publicUrl: 'https://mail.example.com', bindHost: '127.0.0.1', port: 3000,
     allowedOrigins: [], trustProxy: 0 }, oauth: auth.oauth },
     undefined, undefined, { directory, verify: async input => {
-      tested.push({ account: input.account, imap: input.credentials('imap'), smtp: input.credentials('smtp') });
+      tested.push({ account: input.account, imap: await input.credentials('imap'), smtp: await input.credentials('smtp') });
       return { imap: true, smtp: false };
     } }, auth.resolver);
   const http = createHttpServer((req, res) => { req.headers.host = 'mail.example.com'; for (let i = 0; i < req.rawHeaders.length; i += 2) if (req.rawHeaders[i].toLowerCase() === 'host') req.rawHeaders[i + 1] = 'mail.example.com'; app(req, res); }).listen(0, '127.0.0.1'); await once(http, 'listening');

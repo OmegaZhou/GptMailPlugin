@@ -4,8 +4,8 @@
 
 认证模块独立部署，见 `auth/README.md`。邮箱发布包只包含邮箱服务。
 部署邮箱前须通过独立 Nginx 配置暴露 issuer 和 OAuth 端点。若旧站点通过
-`gpt-mail.conf` 间接包含认证路由，先将认证 include 移入 HTTPS server 块，
-由认证部署流程维护，再更新邮箱 include。
+`gpt-mail.conf` 间接包含认证路由，升级脚本会把其顶层外部 include 移入
+同一个 HTTPS server 块，再更新邮箱 include；后续认证路由独立维护。
 
 ## 私有部署参数
 

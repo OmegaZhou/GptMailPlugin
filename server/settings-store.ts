@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { accountSchema, configSchema, credentials, type Account, type Config } from './config.js';
+import type { GoogleGrant, GoogleMailboxGateway } from './mailbox-oauth.js';
 
 const secret = z.string().max(8192).refine(s => !/[\r\n\0]/.test(s)).meta({ writeOnly: true });
 const inputEndpoint = z.object({ host: z.string().trim().min(1).max(253).regex(/^[A-Za-z0-9._:-]+$/),
@@ -12,7 +13,9 @@ export const settingsAccountSchema = z.object({ id: z.string().regex(/^[a-zA-Z0-
   imap: inputEndpoint, smtp: inputEndpoint, folders: z.object({ drafts: z.string().max(1000), sent: z.string().max(1000),
     trash: z.string().max(1000), archive: z.string().max(1000) }).partial().default({}), saveSent: z.boolean().default(true) }).strict();
 const managedSchema = z.object({ account: accountSchema, imap: z.object({ type: z.enum(['password', 'accessToken']), value: secret.min(1) }),
-  smtp: z.object({ type: z.enum(['password', 'accessToken']), value: secret.min(1) }) }).strict();
+  smtp: z.object({ type: z.enum(['password', 'accessToken']), value: secret.min(1) }),
+  oauth: z.object({ provider: z.literal('google'), accessToken: secret.min(1), refreshToken: secret.min(1),
+    expiresAt: z.number().finite().positive() }).strict().optional() }).strict();
 const stateSchema = z.object({ version: z.literal(1), defaultAccount: z.string().optional(),
   accounts: z.array(managedSchema).max(100) }).strip().refine(s => new Set(s.accounts.map(a => a.account.id)).size === s.accounts.length);
 const envelopeSchema = z.object({ version: z.literal(1), salt: z.string(), iv: z.string(), tag: z.string(), ciphertext: z.string() }).strict();
@@ -25,6 +28,8 @@ export class SettingsStore {
   private state: State = { version: 1, accounts: [] };
   private salt = randomBytes(32);
   private queue: Promise<unknown> = Promise.resolve();
+  private refreshes = new Map<string, Promise<GoogleGrant>>();
+  private google?: GoogleMailboxGateway;
   constructor(private directory: string, private storageKey: string, private baseConfig: () => Promise<Config>) {}
   private encryptionKey() { return Buffer.from(hkdfSync('sha256', this.storageKey, this.salt, 'gpt-mail-panel-v1', 32)); }
   async init() {
@@ -74,6 +79,50 @@ export class SettingsStore {
     const value = managed[kind];
     return { user: account[kind].user || account.email, ...(value.type === 'accessToken' ? { accessToken: value.value } : { pass: value.value }) };
   }
+  useGoogle(gateway?: GoogleMailboxGateway) { this.google = gateway; }
+  async resolveCredentials(account: Account, kind: 'imap' | 'smtp') {
+    const managed = this.state.accounts.find(a => a.account.id === account.id);
+    if (!managed?.oauth) return this.credentials(account, kind);
+    if (!this.google) throw new SettingsStoreError('管理员尚未配置 Google OAuth 客户端，请检查服务设置。');
+    if (managed.account.email !== account.email) throw new SettingsStoreError('邮箱配置已改变，请重试。');
+    let grant: GoogleGrant = managed.oauth;
+    if (grant.expiresAt <= Date.now() + 60000) {
+      let pending = this.refreshes.get(account.id);
+      if (!pending) {
+        const oldGrant = structuredClone(grant);
+        pending = (async () => {
+          const refreshed = await this.google!.refresh(oldGrant);
+          await this.transaction(state => {
+            const current = state.accounts.find(a => a.account.id === account.id);
+            if (!current?.oauth || current.account.email !== account.email || current.oauth.refreshToken !== oldGrant.refreshToken ||
+                current.oauth.accessToken !== oldGrant.accessToken || current.oauth.expiresAt !== oldGrant.expiresAt)
+              throw new SettingsStoreError('邮箱已移除或重新授权，请重试。');
+            current.oauth = { provider: 'google', ...refreshed };
+            current.imap.value = refreshed.accessToken; current.smtp.value = refreshed.accessToken;
+          });
+          return refreshed;
+        })();
+        this.refreshes.set(account.id, pending);
+        void pending.finally(() => { if (this.refreshes.get(account.id) === pending) this.refreshes.delete(account.id); }).catch(() => {});
+      }
+      grant = await pending;
+    }
+    return { user: account.email, accessToken: grant.accessToken };
+  }
+  async saveGoogleAccount(id: string, email: string, grant: GoogleGrant, name?: string) {
+    await this.transaction(async state => {
+      const previous = state.accounts.find(a => a.account.id === id);
+      if ((!previous && (await this.baseConfig()).accounts.some(a => a.id === id)) || (previous && previous.account.email !== email))
+        throw new SettingsStoreError('账号 ID 已被另一个邮箱使用，请返回面板使用新的账号 ID。');
+      const account = accountSchema.parse({ id, email, name: name || previous?.account.name || 'Google 邮箱',
+        imap: { host: 'imap.gmail.com', port: 993, secure: true }, smtp: { host: 'smtp.gmail.com', port: 587, secure: false },
+        folders: previous?.account.folders || {}, saveSent: false });
+      const credential = { type: 'accessToken' as const, value: grant.accessToken };
+      state.accounts = [...state.accounts.filter(a => a.account.id !== id), { account, imap: credential, smtp: { ...credential },
+        oauth: { provider: 'google', accessToken: grant.accessToken, refreshToken: grant.refreshToken, expiresAt: grant.expiresAt } }];
+      state.defaultAccount ||= id;
+    });
+  }
   async view() {
     const config = await this.mail();
     return { defaultAccount: config.defaultAccount || null,
@@ -83,12 +132,14 @@ export class SettingsStore {
           user: account[kind].user || account.email, credentialType: managed?.[kind].type || (account[kind].accessTokenEnv ? 'accessToken' : 'password'),
           hasSecret: managed ? true : Boolean(account[kind].passwordEnv || account[kind].accessTokenEnv) });
         return { id: account.id, email: account.email, name: account.name, imap: endpoint('imap'), smtp: endpoint('smtp'),
-          folders: account.folders, saveSent: account.saveSent, editable: Boolean(managed), source: managed ? 'plugin' : 'config' };
+          folders: account.folders, saveSent: account.saveSent, editable: Boolean(managed), source: managed ? 'plugin' : 'config',
+          ...(managed?.oauth ? { provider: 'google', authorization: 'oauth', autoRefresh: true } : {}) };
       }) };
   }
   private async prepare(value: unknown, state = this.state) {
     const input = settingsAccountSchema.parse(value);
     const previous = state.accounts.find(a => a.account.id === input.id);
+    if (previous?.oauth) throw new SettingsStoreError('Google 邮箱使用服务商授权管理，请重新连接 Google；无需填写或修改令牌。');
     const base = await this.baseConfig();
     if (!previous && base.accounts.some(a => a.id === input.id)) throw new SettingsStoreError('该账号由服务端配置文件管理，请使用新的账号 ID。');
     const values = (kind: 'imap' | 'smtp') => {
@@ -138,6 +189,6 @@ export class SettingsStore {
   async testSaved(id: string) {
     const account = (await this.mail()).accounts.find(a => a.id === id);
     if (!account) throw new SettingsStoreError('邮箱账号不存在。');
-    return { account, credentials: (kind: 'imap' | 'smtp') => this.credentials(account, kind) };
+    return { account, credentials: (kind: 'imap' | 'smtp') => this.resolveCredentials(account, kind) };
   }
 }

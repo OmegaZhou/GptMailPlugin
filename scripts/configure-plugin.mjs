@@ -7,4 +7,4 @@ try { address = JSON.parse(await readFile('server/address.json', 'utf8')); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
 const mcp = connectionConfig(plugin, address);
 await writeFile('mcp.json', JSON.stringify(mcp, null, 2) + '\n', { mode: 0o600 });
-console.log('Configured remote OAuth connection in mcp.json. Login credentials are not included. Existing host registrations require separate verification.');
+console.log('Configured the fixed remote endpoint and public OAuth client. Direct MCP ZIP imports are desktop-only; use the existing cloud service binding for ChatGPT across devices. Login credentials are excluded.');

@@ -1,5 +1,9 @@
 {
   "storageKey": "",
+  "googleMailbox": {
+    "clientId": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com",
+    "clientSecretEnv": "GOOGLE_MAIL_CLIENT_SECRET"
+  },
   "oauth": {
     "enabled": true,
     "mcpPath": "/mail-mcp",

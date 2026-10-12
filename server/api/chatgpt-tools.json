@@ -1504,7 +1504,7 @@
       },
       "_meta": {
         "ui": {
-          "resourceUri": "ui://gpt-mail/settings-v1.html",
+          "resourceUri": "ui://gpt-mail/settings-71daa10b4802.html",
           "visibility": [
             "app",
             "model"
@@ -1520,7 +1520,7 @@
             }
           ]
         },
-        "ui/resourceUri": "ui://gpt-mail/settings-v1.html"
+        "ui/resourceUri": "ui://gpt-mail/settings-71daa10b4802.html"
       }
     },
     {
@@ -2006,6 +2006,49 @@
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          }
+        },
+        "required": [
+          "session",
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "visibility": [
+            "app"
+          ]
+        },
+        "openai/visibility": "private"
+      }
+    },
+    {
+      "name": "settings_google_begin",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 64
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
           }
         },
         "required": [
